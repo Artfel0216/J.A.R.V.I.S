@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# J.A.R.V.I.S. — Next.js Edition
 
-## Getting Started
+Interface holográfica de IA com autenticação, banco de dados e integrações externas.
 
-First, run the development server:
+## Stack
+- **Next.js 14** (App Router) + **TypeScript**
+- **Tailwind CSS** — estética holográfica HUD
+- **NextAuth v5** — OAuth Google + GitHub
+- **Prisma + SQLite** — histórico de conversas persistido
+- **Anthropic SDK** — Claude Sonnet 4 com personalidade JARVIS
+- **Web Speech API** — voz bidirecional (STT + TTS)
+- **Canvas API** — visualizador de áudio animado
+
+## Integrações
+| Serviço | Variável | Ativa quando... |
+|---|---|---|
+| OpenWeatherMap | `OPENWEATHER_API_KEY` | usuário pergunta sobre clima |
+| NewsAPI | `NEWSAPI_KEY` | usuário pede notícias |
+| Serper (Google) | `SERPER_API_KEY` | usuário pede busca na web |
+| Wolfram Alpha | `WOLFRAM_APP_ID` | usuário pede cálculos |
+
+## Setup
 
 ```bash
+# 1. Instalar dependências
+npm install
+
+# 2. Gerar cliente Prisma + banco de dados
+npx prisma generate
+npx prisma db push
+
+# 3. Configurar variáveis de ambiente (.env.local)
+ANTHROPIC_API_KEY=sk-ant-...
+NEXTAUTH_SECRET=qualquer-string-aleatoria-segura
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+
+# 4. Rodar em desenvolvimento
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# 5. Build de produção
+npm run build && npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## OAuth — Configuração
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Google:** console.cloud.google.com → APIs → Credenciais → OAuth 2.0
+- Redirect URI: `http://localhost:3000/api/auth/callback/google`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**GitHub:** github.com/settings/developers → OAuth Apps
+- Callback URL: `http://localhost:3000/api/auth/callback/github`
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Estrutura
+```
+src/
+├── app/
+│   ├── page.tsx                    # Redireciona para login ou dashboard
+│   ├── login/page.tsx              # Tela de autenticação
+│   └── api/
+│       ├── auth/[...nextauth]/     # Handler NextAuth
+│       ├── chat/                   # Streaming + integrações
+│       ├── conversations/          # CRUD de conversas
+│       └── health/                 # Status do sistema
+├── components/jarvis/
+│   ├── JarvisDashboard.tsx         # Orquestrador principal
+│   ├── Header.tsx                  # Barra superior com status
+│   ├── Sidebar.tsx                 # Histórico + visualizador + métricas
+│   ├── Visualizer.tsx              # Canvas animado (idle/ouvindo/falando)
+│   ├── MessageBubble.tsx           # Bolha de mensagem
+│   ├── InputBar.tsx                # Input + microfone + TTS toggle
+│   └── BootScreen.tsx              # Tela de inicialização
+├── hooks/
+│   ├── useChat.ts                  # Streaming SSE + histórico
+│   └── useSpeech.ts                # STT + TTS
+├── lib/
+│   ├── auth.ts                     # Configuração NextAuth
+│   ├── prisma.ts                   # Cliente Prisma singleton
+│   ├── integrations.ts             # Clima, notícias, busca, Wolfram
+│   └── utils.ts                    # cn() helper
+└── middleware.ts                   # Proteção de rotas
+```

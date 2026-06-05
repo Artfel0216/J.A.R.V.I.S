@@ -1,0 +1,56 @@
+/* J.A.R.V.I.S. — main.css — Reset + Variáveis Globais */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap');
+
+:root {
+  --cyan:        #00D4FF;
+  --cyan-dim:    #0088AA;
+  --cyan-glow:   rgba(0, 212, 255, 0.3);
+  --cyan-faint:  rgba(0, 212, 255, 0.08);
+  --blue:        #0057FF;
+  --blue-bright: #1E90FF;
+  --red-alert:   #FF3B3B;
+  --gold:        #FFB800;
+  --bg:          #000A0F;
+  --bg-panel:    rgba(0, 20, 35, 0.85);
+  --bg-input:    rgba(0, 30, 50, 0.9);
+  --text:        #B8E8F0;
+  --text-dim:    #5A8A9A;
+  --border:      rgba(0, 212, 255, 0.25);
+  --border-hot:  rgba(0, 212, 255, 0.7);
+  --font-hud:    'Orbitron', monospace;
+  --font-mono:   'Share Tech Mono', monospace;
+  --font-body:   'Exo 2', sans-serif;
+  --radius:      4px;
+  --glow-sm:     0 0 8px rgba(0, 212, 255, 0.4);
+  --glow-md:     0 0 20px rgba(0, 212, 255, 0.5);
+  --glow-lg:     0 0 40px rgba(0, 212, 255, 0.6), 0 0 80px rgba(0, 212, 255, 0.2);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--cyan-dim);
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--cyan-glow);
+  color: #fff;
+}

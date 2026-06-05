@@ -18,9 +18,12 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
-      "@/*": ["./*"]
-    }
+      "@/*": ["./*", "./app/*"]
+    },
+    "types": ["node", "jest"]
   },
   "include": [
     "next-env.d.ts",
