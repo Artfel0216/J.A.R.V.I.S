@@ -82,6 +82,7 @@ export async function sendMessage(
 }
 
 /**
+ * 
  * Health check para verificar se o servidor está online
  */
 export async function checkHealth(): Promise<{ status: string; [key: string]: any }> {
