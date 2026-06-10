@@ -1,9 +1,40 @@
-// src/lib/api.ts
-
 // Tipagem básica para o histórico de mensagens
 export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
+}
+
+/**
+ * Processa uma linha individual extraída do protocolo SSE
+ */
+function parseSSELine(
+  line: string,
+  onToken?: (token: string) => void,
+  onDone?: () => void,
+  onError?: (error: Error) => void
+) {
+  const cleanLine = line.trim();
+  if (!cleanLine || !cleanLine.startsWith('data: ')) return;
+
+  try {
+    const parsed = JSON.parse(cleanLine.slice(6));
+
+    switch (parsed.type) {
+      case 'text':
+        if (typeof parsed.content === 'string') {
+          onToken?.(parsed.content);
+        }
+        break;
+      case 'done':
+        onDone?.();
+        break;
+      case 'error':
+        onError?.(new Error(parsed.content || 'Erro desconhecido no stream'));
+        break;
+    }
+  } catch (err) {
+    console.warn('[SSE PARSE ERROR] Falha ao converter chunk JSON:', err, 'Linha:', cleanLine);
+  }
 }
 
 /**
@@ -17,7 +48,6 @@ export async function sendMessage(
   onError?: (error: Error) => void
 ): Promise<void> {
   try {
-    // No Next.js, caminhos relativos já apontam para a própria origem
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: {
@@ -39,37 +69,35 @@ export async function sendMessage(
     const decoder = new TextDecoder();
     let buffer = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          // CORREÇÃO 2: Libera qualquer caractere residual que restou preso no decodificador
+          buffer += decoder.decode(); 
+          break;
+        }
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      
-      // Mantém a última linha incompleta no buffer
-      buffer = lines.pop() || '';
+        // Alimenta o buffer com os novos chunks de bytes recebidos
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        
+        // Mantém apenas a última linha possivelmente incompleta no buffer
+        buffer = lines.pop() ?? '';
 
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-
-        try {
-          const parsed = JSON.parse(line.slice(6));
-
-          switch (parsed.type) {
-            case 'text':
-              onToken?.(parsed.content);
-              break;
-            case 'done':
-              onDone?.();
-              break;
-            case 'error':
-              onError?.(new Error(parsed.content));
-              break;
-          }
-        } catch (err) {
-          console.warn('[SSE PARSE ERROR]', err);
+        for (const line of lines) {
+          parseSSELine(line, onToken, onDone, onError);
         }
       }
+
+      // CORREÇÃO 1: Se sobrou algum dado pendente no buffer após o fim do stream, processa-o
+      if (buffer.trim()) {
+        parseSSELine(buffer, onToken, onDone, onError);
+      }
+    } finally {
+      // Garante a liberação do leitor da conexão HTTP para evitar vazamento de sockets
+      reader.releaseLock();
     }
   } catch (err) {
     console.error('[API ERROR]', err);
@@ -82,12 +110,16 @@ export async function sendMessage(
 }
 
 /**
- * 
- * Health check para verificar se o servidor está online
+ * Verifica a saúde do sistema com timeout de segurança
  */
 export async function checkHealth(): Promise<{ status: string; [key: string]: any }> {
   try {
-    const response = await fetch('/api/health');
+    // CORREÇÃO 3: Adicionado AbortSignal para derrubar a requisição após 3 segundos caso a API trave
+    const response = await fetch('/api/health', { 
+      signal: AbortSignal.timeout(3000) 
+    });
+    
+    if (!response.ok) throw new Error();
     return await response.json();
   } catch {
     return { status: 'offline' };

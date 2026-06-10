@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   _req: NextRequest,
@@ -10,8 +10,8 @@ export async function GET(
     const [session, { id }] = await Promise.all([auth(), params])
     
     if (!session?.user?.id) {
-      console.error('[API Conversation [id]] User not authenticated')
-      return new Response(JSON.stringify({ error: 'Não autorizado' }), { status: 401 })
+      console.error('[STARK SECURITY] Tentativa de acesso bloqueada: Usuário não autenticado.')
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
     
     const convo = await prisma.conversation.findFirst({
@@ -25,21 +25,27 @@ export async function GET(
     })
     
     if (!convo) {
-      return new Response(JSON.stringify({ error: 'Conversa não encontrada' }), { status: 404 })
+      return NextResponse.json({ error: 'Conversa não encontrada' }, { status: 404 })
     }
 
-    convo.messages.reverse()
+    const chronologicalMessages = [...convo.messages].reverse()
     
-    return new Response(JSON.stringify(convo), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+    return NextResponse.json(
+      {
+        ...convo,
+        messages: chronologicalMessages
       },
-    })
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'private, no-cache, no-store, must-revalidate',
+        },
+      }
+    )
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Erro no servidor'
-    console.error('[API Conversation [id]] Error:', error)
-    return new Response(JSON.stringify({ error: message }), { status: 500 })
+    const message = error instanceof Error ? error.message : 'Erro interno do servidor'
+    console.error('[STARK MEMORY ERROR] Falha catastrófica ao recuperar registros do banco:', error)
+    
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

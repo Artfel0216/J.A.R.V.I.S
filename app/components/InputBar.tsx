@@ -1,18 +1,16 @@
 'use client'
 
-import { useState, useRef, KeyboardEvent, useEffect } from 'react'
+import { useState, useRef, KeyboardEvent } from 'react'
 import { Mic, MicOff, Send, Volume2, VolumeX, Square, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Props {
   conversationId?: string | null
+  onSubmit?: (message: string) => Promise<void> | void
   onStreamStart?: () => void
-  onStreamChunk?: (text: string) => void
-  onStreamDone?: (finalText: string) => void
-  onMetaUpdate?: (conversationId: string) => void
   onError?: (error: string) => void
+  onAbort?: () => void
   
-  // Controles de Voz recebidos do Pai
   onVoiceToggle: () => void
   onTtsToggle: () => void
   isListening: boolean
@@ -23,11 +21,10 @@ interface Props {
 
 export function InputBar({
   conversationId,
+  onSubmit,
   onStreamStart,
-  onStreamChunk,
-  onStreamDone,
-  onMetaUpdate,
   onError,
+  onAbort,
   onVoiceToggle,
   onTtsToggle,
   isListening,
@@ -38,12 +35,6 @@ export function InputBar({
   const [value, setValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
-
-  // Cancela qualquer requisição ativa se o componente for desmontado
-  useEffect(() => {
-    return () => abortControllerRef.current?.abort()
-  }, [])
 
   const handleSend = async () => {
     if (!value.trim() || isLoading) return
@@ -53,83 +44,21 @@ export function InputBar({
     setIsLoading(true)
     onStreamStart?.()
 
-    // Inicializa o AbortController para permitir cancelar a requisição instantaneamente
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: currentMessage,
-          conversationId: conversationId || undefined
-        }),
-        signal: controller.signal
-      })
-
-      if (!response.ok) {
-        throw new Error(`Erro na requisição: ${response.statusText}`)
-      }
-
-      if (!response.body) {
-        throw new Error('ReadableStream não suportado pelo servidor.')
-      }
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let accumulatedResponse = ''
-
-      // Processa o stream Server-Sent Events (SSE) vindo da API
-      while (true) {
-        const { value: chunk, done } = await reader.read()
-        if (done) break
-
-        const decodedChunk = decoder.decode(chunk, { stream: true })
-        const lines = decodedChunk.split('\n')
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const rawJson = line.slice(6).trim()
-              if (!rawJson) continue
-              
-              const parsed = JSON.parse(rawJson)
-
-              if (parsed.type === 'meta' && parsed.conversationId) {
-                onMetaUpdate?.(parsed.conversationId)
-              } else if (parsed.type === 'text' && parsed.content) {
-                accumulatedResponse += parsed.content
-                onStreamChunk?.(parsed.content)
-              } else if (parsed.type === 'done') {
-                onStreamDone?.(accumulatedResponse)
-              } else if (parsed.type === 'error') {
-                throw new Error(parsed.content)
-              }
-            } catch (e) {
-              // Ignora falhas parciais de parsing de linhas incompletas no buffer do stream
-            }
-          }
-        }
-      }
+      await onSubmit?.(currentMessage)
     } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        console.error('[Streaming Error]:', err)
-        onError?.(err.message || 'Falha ao processar comando.')
-      }
+      console.error('[InputBar Error]:', err)
+      onError?.(err.message || 'Falha ao processar comando.')
     } finally {
       setIsLoading(false)
-      abortControllerRef.current = null
       setTimeout(() => inputRef.current?.focus(), 50)
     }
   }
 
   const handleAbort = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      setIsLoading(false)
-      onError?.('Conexão encerrada pelo comando do Operador.')
-    }
+    onAbort?.()
+    setIsLoading(false)
+    onError?.('Conexão encerrada pelo comando do Operador.')
   }
 
   const handleKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -141,20 +70,17 @@ export function InputBar({
 
   return (
     <footer className="w-full max-w-5xl mx-auto px-4 py-6 transition-all duration-500">
-      {/* Container Principal Holográfico */}
       <div className={cn(
         "relative rounded-2xl border bg-slate-950/60 backdrop-blur-xl p-3 transition-all duration-500 shadow-2xl",
         isLoading ? "border-cyan-500/40 shadow-[0_0_30px_rgba(6,182,212,0.15)]" : "border-slate-800/80 hover:border-slate-700/80",
         isListening && "border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.15)]"
       )}>
         
-        {/* Linha de Carregamento Animada (Scanning Line) */}
         {isLoading && (
           <div className="absolute top-0 left-4 right-4 h-px bg-linear-to-r from-transparent via-cyan-400 to-transparent animate-pulse" />
         )}
 
         <div className="flex items-center gap-3">
-          {/* Botão de Microfone com Radar de Pulso */}
           <button
             onClick={onVoiceToggle}
             disabled={!voiceSupported}
@@ -173,7 +99,6 @@ export function InputBar({
             {isListening ? <MicOff size={18} className="animate-bounce" /> : <Mic size={18} />}
           </button>
 
-          {/* Campo de Texto Interno */}
           <div className="relative flex-1 flex items-center">
             <input
               ref={inputRef}
@@ -191,7 +116,6 @@ export function InputBar({
             )}
           </div>
 
-          {/* Controle de Text-to-Speech (Voz de Resposta) */}
           <button
             onClick={onTtsToggle}
             title={ttsEnabled ? 'Mutar Saída de Áudio' : 'Ativar Sintetizador de Voz'}
@@ -205,7 +129,6 @@ export function InputBar({
             {ttsEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
           </button>
 
-          {/* Botão de Envio / Abortar Interativo */}
           {isLoading ? (
             <button
               onClick={handleAbort}
@@ -229,7 +152,6 @@ export function InputBar({
           )}
         </div>
 
-        {/* Barra de Status Inferior Futurista */}
         <div className="flex justify-between items-center mt-3 px-1 text-[10px] font-mono tracking-wider text-slate-500">
           <div className="flex items-center gap-2">
             <span className={cn("w-1.5 h-1.5 rounded-full", isLoading ? "bg-cyan-400 animate-ping" : "bg-emerald-500")} />

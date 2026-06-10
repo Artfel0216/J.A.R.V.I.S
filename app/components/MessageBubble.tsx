@@ -9,7 +9,6 @@ import { useMemo } from 'react'
 function formatContentSecure(text: string) {
   if (!text) return []
   
-  // Regex para capturar Bold (**), Italic (*) e Inline Code (`)
   const regex = /(\*\*.*?\*\*|\*.*?\*|`.*?`|\n)/g
   const parts = text.split(regex)
 
@@ -26,7 +25,7 @@ function formatContentSecure(text: string) {
     }
     if (part.startsWith('`') && part.endsWith('`')) {
       return (
-        <code key={index} className="bg-cyan-950/40 text-cyan-300 border border-cyan-500/20 px-1.5 py-0.5 rounded font-mono text-xs mx-0.5">
+        <code key={index} className="bg-cyan-950/40 text-cyan-300 border border-cyan-500/20 px-1.5 py-0.5 rounded font-mono text-xs mx-0.5 inline-block break-all">
           {part.slice(1, -1)}
         </code>
       )
@@ -41,12 +40,10 @@ function formatContentSecure(text: string) {
 export function MessageBubble({ message }: { message: Message }) {
   const isJarvis = message.role === 'assistant'
 
-  // Memoiza o conteúdo formatado para evitar reprocessamento de texto em re-renders do chat
   const formattedContent = useMemo(() => {
     return formatContentSecure(message.content)
   }, [message.content])
 
-  // Trata a data de criação com fallback seguro para evitar estouros de objeto Date
   const formattedTime = useMemo(() => {
     try {
       const date = message.createdAt ? new Date(message.createdAt) : new Date()
@@ -62,7 +59,6 @@ export function MessageBubble({ message }: { message: Message }) {
       isJarvis ? 'self-start' : 'self-end flex-row-reverse'
     )}>
       
-      {/* AVATAR BIOMÉTRICO (J.A.R.V.I.S. vs OPERADOR) */}
       <div className={cn(
         'w-9 h-9 rounded-xl border flex items-center justify-center text-xs font-mono font-black shrink-0 mt-0.5 transition-all duration-300 group-hover:scale-105 select-none',
         isJarvis
@@ -72,10 +68,8 @@ export function MessageBubble({ message }: { message: Message }) {
         {isJarvis ? 'J' : 'S'}
       </div>
 
-      {/* BLOCO DE TRANSMISSÃO DE DADOS */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 max-w-full">
         
-        {/* Metadados de Identificação do Canal */}
         <div className={cn(
           'text-[8px] font-mono tracking-[2px] uppercase font-bold opacity-60',
           isJarvis ? 'text-cyan-500' : 'text-amber-500 text-right'
@@ -84,7 +78,7 @@ export function MessageBubble({ message }: { message: Message }) {
         </div>
 
         <div className={cn(
-          'px-4 py-3 rounded-2xl text-sm leading-relaxed border transition-all duration-300 shadow-lg font-sans tracking-wide',
+          'px-4 py-3 rounded-2xl text-sm leading-relaxed border transition-all duration-300 shadow-lg font-sans tracking-wide max-w-full overflow-hidden',
           isJarvis
             ? 'bg-slate-950/40 border-slate-900 border-l-2 border-l-cyan-500 text-slate-200 group-hover:border-slate-800 group-hover:border-l-cyan-400'
             : 'bg-amber-950/5 border-slate-900 border-r-2 border-r-amber-500 text-slate-200 group-hover:border-slate-800 group-hover:border-r-amber-400'
@@ -92,7 +86,6 @@ export function MessageBubble({ message }: { message: Message }) {
           {message.content ? (
             <p className="whitespace-pre-wrap wrap-break-word">{formattedContent}</p>
           ) : (
-            /* Pulsador de Processamento Quântico (Pensando...) */
             <div className="flex gap-1.5 items-center py-2 px-1">
               {[0, 150, 300].map(d => (
                 <span 
@@ -105,7 +98,6 @@ export function MessageBubble({ message }: { message: Message }) {
           )}
         </div>
 
-        {/* Timestamp de Telemetria Inferior */}
         <div className={cn(
           "text-[8px] font-mono text-slate-600 px-1 uppercase tracking-wider",
           !isJarvis && "text-right"

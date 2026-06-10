@@ -70,7 +70,8 @@ export function Header({ session, isOnline }: { session: Session | null; isOnlin
 
         <div className="flex items-center gap-2">
           <Cpu size={12} className="text-slate-500" />
-          <span>NÚCLEO: <span className="text-slate-300">SONNET 4</span></span>
+          {/* CORREÇÃO VISUAL: Alinhado com o backend real claude-3-5-sonnet */}
+          <span>NÚCLEO: <span className="text-slate-300">SONNET 3.5</span></span>
         </div>
 
         <div className="w-px h-3 bg-slate-800" />

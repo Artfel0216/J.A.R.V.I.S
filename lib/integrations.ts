@@ -1,5 +1,44 @@
-// ── Clima ─────────────────────────────────────────────────
-export async function getWeather(city: string) {
+export interface WeatherResponse {
+  city: string
+  country: string
+  temp: number
+  feels_like: number
+  description: string
+  humidity: number
+  wind: number
+  error?: never
+}
+
+export interface NewsResponse {
+  articles: Array<{
+    title: string
+    source: string | undefined
+    url: string
+    publishedAt: string
+  }>
+  error?: never
+}
+
+export interface SearchResponse {
+  results: Array<{
+    title: string
+    snippet: string
+    link: string
+  }>
+  answerBox: string | null
+  error?: never
+}
+
+export interface WolframResponse {
+  result: string
+  error?: never
+}
+
+interface ToolError {
+  error: string
+}
+
+export async function getWeather(city: string): Promise<WeatherResponse | ToolError> {
   const key = process.env.OPENWEATHER_API_KEY
   if (!key) return { error: 'API de clima não configurada.' }
   try {
@@ -11,33 +50,37 @@ export async function getWeather(city: string) {
     const d = await r.json()
     return {
       city: d.name,
-      country: d.sys.country,
+      country: d.sys?.country,
       temp: Math.round(d.main.temp),
       feels_like: Math.round(d.main.feels_like),
-      description: d.weather[0].description,
+      description: d.weather[0]?.description,
       humidity: d.main.humidity,
-      wind: Math.round(d.wind.speed * 3.6),
+      wind: Math.round(d.wind?.speed * 3.6),
     }
   } catch {
     return { error: 'Falha ao consultar clima.' }
   }
 }
 
-// ── Notícias ─────────────────────────────────────────────
-export async function getNews(query: string) {
+export async function getNews(query: string): Promise<NewsResponse | ToolError> {
   const key = process.env.NEWSAPI_KEY
   if (!key) return { error: 'API de notícias não configurada.' }
   try {
     const r = await fetch(
       `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&language=pt&sortBy=publishedAt&pageSize=5&apiKey=${key}`,
-      { next: { revalidate: 300 } }
+      { 
+        next: { revalidate: 300 } ,
+        headers: {
+          'User-Agent': 'JarvisDashboard/1.0'
+        }
+      }
     )
     if (!r.ok) return { error: 'Falha ao buscar notícias.' }
     const d = await r.json()
     return {
-      articles: (d.articles || []).slice(0, 5).map((a: Record<string, string>) => ({
+      articles: (d.articles || []).slice(0, 5).map((a: any) => ({
         title: a.title,
-        source: ((a.source as unknown as Record<string, string>))?.name,
+        source: a.source?.name,
         url: a.url,
         publishedAt: a.publishedAt,
       })),
@@ -47,8 +90,7 @@ export async function getNews(query: string) {
   }
 }
 
-// ── Busca Web ────────────────────────────────────────────
-export async function searchWeb(query: string) {
+export async function searchWeb(query: string): Promise<SearchResponse | ToolError> {
   const key = process.env.SERPER_API_KEY
   if (!key) return { error: 'API de busca não configurada.' }
   try {
@@ -60,7 +102,7 @@ export async function searchWeb(query: string) {
     if (!r.ok) return { error: 'Falha na busca.' }
     const d = await r.json()
     return {
-      results: (d.organic || []).slice(0, 5).map((item: Record<string, string>) => ({
+      results: (d.organic || []).slice(0, 5).map((item: any) => ({
         title: item.title,
         snippet: item.snippet,
         link: item.link,
@@ -72,8 +114,7 @@ export async function searchWeb(query: string) {
   }
 }
 
-// ── Wolfram Alpha ─────────────────────────────────────────
-export async function wolframQuery(query: string) {
+export async function wolframQuery(query: string): Promise<WolframResponse | ToolError> {
   const id = process.env.WOLFRAM_APP_ID
   if (!id) return { error: 'Wolfram Alpha não configurado.' }
   try {
@@ -89,36 +130,37 @@ export async function wolframQuery(query: string) {
   }
 }
 
-// ── Router de intenção ────────────────────────────────────
 export type IntegrationResult = {
   type: 'weather' | 'news' | 'search' | 'wolfram' | 'none'
-  data: Record<string, unknown>
+  data: Record<string, any>
 }
 
 export async function resolveIntegration(message: string): Promise<IntegrationResult> {
-  const lower = message.toLowerCase()
+  const lower = message.toLowerCase().trim()
 
-  const weatherMatch = lower.match(/clima|temperatura|tempo\s+em\s+(.+)|weather/i)
-  if (weatherMatch) {
-    const city = lower.match(/em\s+([a-záàãâéêíóôõúç\s]+)/i)?.[1]?.trim() || 'São Paulo'
+  const isWeather = /\b(clima|temperatura|weather)\b/i.test(lower) || (/\btempo\b/i.test(lower) && /\b(em|hoje|amanhã|como)\b/i.test(lower))
+  
+  if (isWeather) {
+    const cityMatch = lower.match(/(?:em|para)\s+([a-záàãâéêíóôõúç\s]+)/i)
+    const city = cityMatch?.[1]?.trim() || 'São Paulo'
     const data = await getWeather(city)
-    return { type: 'weather', data: data as Record<string, unknown> }
+    return { type: 'weather', data }
   }
 
-  if (/notícia|news|manchete|jornal/i.test(lower)) {
+  if (/\b(notícia|news|manchete|jornal)\b/i.test(lower)) {
     const q = lower.replace(/notícia|news|manchete|jornal|sobre|de/gi, '').trim() || 'brasil'
     const data = await getNews(q)
-    return { type: 'news', data: data as Record<string, unknown> }
+    return { type: 'news', data }
   }
 
-  if (/calcul|quanto é|resolver|equação|integral|derivad|wolfram/i.test(lower)) {
+  if (/(calcul|quanto é|resolver|equação|integral|derivad|wolfram)/i.test(lower)) {
     const data = await wolframQuery(message)
-    return { type: 'wolfram', data: data as Record<string, unknown> }
+    return { type: 'wolfram', data }
   }
 
-  if (/buscar|pesquisar|procurar|search|o que é|quem é|quando foi/i.test(lower)) {
+  if (/(buscar|pesquisar|procurar|search|o que é|quem é|quando foi)/i.test(lower)) {
     const data = await searchWeb(message)
-    return { type: 'search', data: data as Record<string, unknown> }
+    return { type: 'search', data }
   }
 
   return { type: 'none', data: {} }

@@ -1,5 +1,3 @@
-'use client'
-
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Message } from '@/types'
 
@@ -9,12 +7,10 @@ export function useChat(initialConversationId?: string) {
   const [conversationId, setConversationId] = useState<string | undefined>(initialConversationId)
   
   const abortRef = useRef<AbortController | null>(null)
-  
-  // Refs de sincronização para blindar o useCallback contra re-criações desnecessárias
   const conversationIdRef = useRef(conversationId)
   const isLoadingRef = useRef(isLoading)
+  const messagesRef = useRef(messages) 
 
-  // Mantém as referências sempre atualizadas com o estado do React
   useEffect(() => {
     conversationIdRef.current = conversationId
   }, [conversationId])
@@ -23,14 +19,20 @@ export function useChat(initialConversationId?: string) {
     isLoadingRef.current = isLoading
   }, [isLoading])
 
-  // Limpa requisições pendentes se o componente for desmontado do DOM
+  useEffect(() => {
+    messagesRef.current = messages 
+  }, [messages])
+
   useEffect(() => {
     return () => abortRef.current?.abort()
   }, [])
 
   const sendMessage = useCallback(async (content: string) => {
-    // Validação usando a referência para evitar travas por closures antigas
     if (!content.trim() || isLoadingRef.current) return
+
+    if (abortRef.current) {
+      abortRef.current.abort()
+    }
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -39,18 +41,47 @@ export function useChat(initialConversationId?: string) {
       createdAt: new Date(),
     }
     
-    setMessages(prev => [...prev, userMsg])
-    setIsLoading(true)
-
     const assistantId = crypto.randomUUID()
-    setMessages(prev => [...prev, {
+    const assistantMsg: Message = {
       id: assistantId, 
       role: 'assistant', 
       content: '', 
       createdAt: new Date(),
-    }])
+    }
+
+    const currentHistory = messagesRef.current
+
+    setMessages(prev => [...prev, userMsg, assistantMsg])
+    setIsLoading(true)
 
     abortRef.current = new AbortController()
+
+    const processLine = (rawLine: string) => {
+      const line = rawLine.trim()
+      if (!line || !line.startsWith('data: ')) return
+      
+      try {
+        const parsed = JSON.parse(line.slice(6))
+        
+        if (parsed.type === 'meta' && parsed.conversationId) {
+          setConversationId(parsed.conversationId)
+        }
+        
+        if (parsed.type === 'text' && parsed.content) {
+          setMessages(prev => prev.map(m =>
+            m.id === assistantId ? { ...m, content: m.content + parsed.content } : m
+          ))
+        }
+
+        if (parsed.type === 'error' && parsed.content) {
+          throw new Error(parsed.content)
+        }
+      } catch (err) {
+        if (err instanceof Error && err.message) throw err
+
+      }
+
+    }
 
     try {
       const res = await fetch('/api/chat', {
@@ -58,12 +89,16 @@ export function useChat(initialConversationId?: string) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: content, 
-          conversationId: conversationIdRef.current // Usa a referência imutável na renderização
+          conversationId: conversationIdRef.current,
+          history: currentHistory 
         }),
         signal: abortRef.current.signal,
       })
 
-      if (!res.ok) throw new Error('ERR_NETWORK_DISCONNECT')
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null)
+        throw new Error(errorData?.error || `Erro de comunicação com o servidor (${res.status})`)
+      }
 
       const reader = res.body?.getReader()
       if (!reader) throw new Error('ERR_STREAM_READ_FAILED')
@@ -74,53 +109,36 @@ export function useChat(initialConversationId?: string) {
       while (true) {
         const { done, value } = await reader.read()
         
-        // 🚀 CORREÇÃO: Processa qualquer dado restante no buffer antes de encerrar
         if (done) {
-          if (buffer.trim().startsWith('data: ')) {
-            processLine(buffer, assistantId)
+          if (buffer.trim()) {
+            processLine(buffer)
           }
           break
         }
 
         buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
+        const lines = buffer.split(/\r?\n/)
         buffer = lines.pop() ?? ''
 
         for (const line of lines) {
-          processLine(line, assistantId)
+          processLine(line)
         }
       }
     } catch (err: unknown) {
       if ((err as Error).name !== 'AbortError') {
         console.error('[STARK MAIN_FRAME] Erro no pipeline de IA:', err)
+        const errorMessage = (err as Error).message
+        
         setMessages(prev => prev.map(m =>
           m.id === assistantId
-            ? { ...m, content: 'Sistemas de processamento cognitivo sobrecarregados. Falha de uplink, Senhor.' }
+            ? { ...m, content: `Sistemas sobrecarregados. Nota: ${errorMessage}` }
             : m
         ))
       }
     } finally {
       setIsLoading(false)
     }
-  }, []) // 🚀 CORREÇÃO: Array de dependências completamente limpo! O hook nunca é recriado.
-
-  // Função utilitária interna para parsear linhas SSE de forma segura
-  const processLine = (line: string, assistantId: string) => {
-    if (!line.startsWith('data: ')) return
-    try {
-      const parsed = JSON.parse(line.slice(6))
-      if (parsed.type === 'meta' && parsed.conversationId) {
-        setConversationId(parsed.conversationId)
-      }
-      if (parsed.type === 'text' && parsed.content) {
-        setMessages(prev => prev.map(m =>
-          m.id === assistantId ? { ...m, content: m.content + parsed.content } : m
-        ))
-      }
-    } catch {
-      // Ignora fragmentos JSON incompletos do streaming
-    }
-  }
+  }, []) 
 
   const loadConversation = useCallback(async (id: string) => {
     try {
@@ -130,6 +148,7 @@ export function useChat(initialConversationId?: string) {
       
       setConversationId(id)
       setMessages(data.messages.map((m: Message) => ({ 
+        ...m, 
         ...m, 
         createdAt: new Date(m.createdAt) 
       })))
@@ -150,7 +169,7 @@ export function useChat(initialConversationId?: string) {
       content,
       createdAt: new Date(),
     }
-    setMessages(prev => [assistantMsg, ...prev]) // Insere no início do log (Prepend)
+    setMessages(prev => [assistantMsg, ...prev]) 
   }, [])
 
   const abort = useCallback(() => {

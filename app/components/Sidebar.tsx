@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useTransition } from 'react'
 import { Conversation } from '@/types'
 import { cn } from '@/lib/utils'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Visualizer } from './Visualizer'
 import { VisualizerMode } from '@/types'
@@ -25,13 +25,11 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
   const [metrics, setMetrics] = useState({ cpu: 22, mem: 47, net: 71 })
   const [isPending, startTransition] = useTransition()
 
-  // 🚀 OTIMIZAÇÃO: Chamada de API encapsulada e reativa
   const loadConvos = useCallback(async () => {
     try {
       const response = await fetch('/api/conversations')
       if (response.ok) {
         const data = await response.json()
-        // Transição suave para evitar trancadas na UI principal
         startTransition(() => {
           setConvos(data)
         })
@@ -41,12 +39,10 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
     }
   }, [])
 
-  // Sincroniza sempre que carregar ou mudar o ID ativo
   useEffect(() => {
     loadConvos()
   }, [loadConvos, activeId])
 
-  // Simulador de Telemetria Dinâmica (Diagnóstico Stark)
   useEffect(() => {
     const interval = setInterval(() => {
       setMetrics({
@@ -58,11 +54,9 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
     return () => clearInterval(interval)
   }, [])
 
-  // Handler de exclusão otimizado com atualização otimista na UI
   const deleteConvo = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     
-    // Atualização otimista imediata para resposta instantânea ao clique
     setConvos(prev => prev.filter(c => c.id !== id))
     if (activeId === id) onNew()
 
@@ -74,14 +68,13 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
       })
     } catch (error) {
       console.error('[STARK CLOUD] Erro ao deletar registro:', error)
-      loadConvos() // Reverte se falhar
+      loadConvos() 
     }
   }
 
   return (
     <aside className="w-72 flex flex-col gap-4 p-4 bg-slate-950/30 border-r border-slate-900/60 overflow-y-auto shrink-0 select-none scrollbar-none h-full relative z-20">
       
-      {/* SEÇÃO 1: CORRELAÇÃO NEURAL (VISUALIZER VAD) */}
       <div className="relative p-4 rounded-2xl border border-slate-900/80 bg-slate-950/40 backdrop-blur-xl flex flex-col items-center gap-3 group transition-all duration-300 hover:border-cyan-500/20">
         <div className="flex items-center gap-1.5 self-start text-[9px] font-mono tracking-[2px] text-cyan-500/60 font-bold uppercase">
           <BrainCircuit size={12} className="text-cyan-500" />
@@ -106,7 +99,6 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
         </div>
       </div>
 
-      {/* SEÇÃO 2: TELEMETRIA E DIAGNÓSTICO DO NÚCLEO */}
       <div className="p-4 rounded-2xl border border-slate-900/80 bg-slate-950/40 backdrop-blur-xl flex flex-col gap-3.5 transition-all duration-300 hover:border-cyan-500/10">
         <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[2px] text-cyan-500/60 font-bold uppercase">
           <BarChart3 size={11} />
@@ -135,7 +127,6 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
         </div>
       </div>
 
-      {/* SEÇÃO 3: HISTÓRICO DE DIRETRIZES */}
       <div className="p-4 rounded-2xl border border-slate-900/80 bg-slate-950/40 backdrop-blur-xl flex-1 flex flex-col min-h-0 transition-all duration-300 hover:border-cyan-500/10">
         <div className="flex items-center justify-between mb-3.5 shrink-0">
           <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[2px] text-cyan-500/60 font-bold uppercase">
@@ -151,7 +142,6 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
           </button>
         </div>
 
-        {/* Viewport dos Itens de Log */}
         <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-1 scrollbar-thin scrollbar-thumb-slate-900 scrollbar-track-transparent">
           {isPending && convos.length === 0 && (
             <div className="flex items-center justify-center py-6 text-slate-600 animate-spin">
@@ -167,6 +157,9 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
 
           {convos.map(c => {
             const isSelected = activeId === c.id
+            
+            const safeDate = typeof c.updatedAt === 'string' ? parseISO(c.updatedAt) : new Date(c.updatedAt)
+
             return (
               <div
                 key={c.id}
@@ -178,7 +171,6 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
                     : 'border-slate-900/60 hover:border-slate-800 hover:bg-slate-900/20'
                 )}
               >
-                {/* Indicador Lateral Ativo */}
                 {isSelected && (
                   <div className="absolute left-0 top-3 bottom-3 w-0.5 bg-cyan-400 rounded-r shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
                 )}
@@ -191,10 +183,9 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
                 </div>
                 
                 <div className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">
-                  {formatDistanceToNow(new Date(c.updatedAt), { addSuffix: true, locale: ptBR })}
+                  {formatDistanceToNow(safeDate, { addSuffix: true, locale: ptBR })}
                 </div>
 
-                {/* Botão Deletar Invisível de Alta Fusão */}
                 <button
                   onClick={(e) => deleteConvo(c.id, e)}
                   className="absolute right-2.5 top-[50%] translate-y-[-50%] opacity-0 group-hover:opacity-100 p-1.5 rounded-lg border border-transparent text-slate-600 hover:text-red-400 hover:border-red-500/20 hover:bg-red-950/20 transition-all duration-200"

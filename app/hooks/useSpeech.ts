@@ -54,7 +54,6 @@ export function useSpeech() {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isSupported, setIsSupported] = useState(false)
   
-  // Tipagens agora são perfeitamente reconhecidas pelo VS Code e compilador do Next.js
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const synthRef = useRef<SpeechSynthesis | null>(null)
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null)
