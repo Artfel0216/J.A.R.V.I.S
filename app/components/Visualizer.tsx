@@ -3,17 +3,64 @@
 import { useEffect, useRef } from 'react'
 import { VisualizerMode } from '@/types'
 
-const MODE_THEMES: Record<VisualizerMode, { main: string; glow: string; text: string }> = {
-  idle: { main: '0, 212, 255', glow: '0, 100, 250', text: 'J.A.R.V.I.S' },
-  listening: { main: '239, 68, 68', glow: '153, 27, 27', text: 'CAPTANDO' },
-  thinking: { main: '234, 179, 8', glow: '146, 64, 14', text: 'COGNIÇÃO' },
-  speaking: { main: '34, 211, 238', glow: '8, 145, 178', text: 'FALANDO' }
+const MODE_THEMES: Record<VisualizerMode, { rgbMain: [number, number, number]; rgbGlow: [number, number, number]; text: string }> = {
+  idle: { rgbMain: [245, 158, 11], rgbGlow: [146, 64, 14], text: 'J.A.R.V.I.S' },
+  listening: { rgbMain: [220, 38, 38], rgbGlow: [153, 27, 27], text: 'BIOMETRIA' },
+  thinking: { rgbMain: [251, 191, 36], rgbGlow: [180, 83, 9], text: 'COGNICÃO' },
+  speaking: { rgbMain: [245, 158, 11], rgbGlow: [220, 38, 38], text: 'NEXUS_OUT' }
 }
+
+const TARGET_PARAMS = {
+  idle: { speed: 0.03, amp: 0.05, baseAmp: 0.04, freq: 0.4 },
+  listening: { speed: 0.12, amp: 0.35, baseAmp: 0.05, freq: 0.3 },
+  thinking: { speed: 0.06, amp: 0.20, baseAmp: 0.06, freq: 1.5 },
+  speaking: { speed: 0.10, amp: 0.45, baseAmp: 0.05, freq: 0.15 }
+}
+
+const lerp = (start: number, end: number, amt: number) => start + (end - start) * amt
 
 export function Visualizer({ mode }: { mode: VisualizerMode }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const modeRef = useRef<VisualizerMode>(mode)
   const frameRef = useRef(0)
   const animRef = useRef<number>(0)
+
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
+  const currentColors = useRef({ main: [245, 158, 11], glow: [146, 64, 14] })
+  const currentParams = useRef({ speed: 0.03, amp: 0.05, baseAmp: 0.04, freq: 0.4 })
+
+  useEffect(() => {
+    modeRef.current = mode
+
+    if (mode === 'listening' && !analyserRef.current) {
+      navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        .then(stream => {
+          streamRef.current = stream
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+          const audioCtx = new AudioContextClass()
+          const analyser = audioCtx.createAnalyser()
+          analyser.fftSize = 256 
+          
+          const source = audioCtx.createMediaStreamSource(stream)
+          source.connect(analyser)
+          
+          audioContextRef.current = audioCtx
+          analyserRef.current = analyser
+          dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount)
+        })
+        .catch(() => console.warn('[STARK HUD] Permissão de mic negada. Usando fallback matemático.'))
+    } 
+    
+    if (mode !== 'listening' && streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+      analyserRef.current = null
+    }
+  }, [mode])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -38,23 +85,40 @@ export function Visualizer({ mode }: { mode: VisualizerMode }) {
       
       ctx.clearRect(0, 0, W, H)
       
+      const activeMode = modeRef.current
+      const targetTheme = MODE_THEMES[activeMode]
+      const targetParam = TARGET_PARAMS[activeMode]
+
+      currentColors.current.main = currentColors.current.main.map((c, i) => lerp(c, targetTheme.rgbMain[i], 0.08))
+      currentColors.current.glow = currentColors.current.glow.map((c, i) => lerp(c, targetTheme.rgbGlow[i], 0.08))
+
+      currentParams.current.speed = lerp(currentParams.current.speed, targetParam.speed, 0.08)
+      currentParams.current.amp = lerp(currentParams.current.amp, targetParam.amp, 0.08)
+      currentParams.current.baseAmp = lerp(currentParams.current.baseAmp, targetParam.baseAmp, 0.08)
+      currentParams.current.freq = lerp(currentParams.current.freq, targetParam.freq, 0.08)
+
+      const mainStr = currentColors.current.main.map(Math.round).join(', ')
+      const glowStr = currentColors.current.glow.map(Math.round).join(', ')
       const baseR = W * 0.26
-      const theme = MODE_THEMES[mode]
+      const { speed, amp, baseAmp, freq } = currentParams.current
 
+      if (analyserRef.current && dataArrayRef.current) {
+        analyserRef.current.getByteFrequencyData(dataArrayRef.current)
+      }
+
+      // Anéis Periféricos
       const rings = [
-        { r: W * 0.45, alpha: 0.05, dash: [2, 10], speed: 0.002 },
-        { r: W * 0.42, alpha: 0.12, dash: [15, 45], speed: -0.006 },
-        { r: W * 0.36, alpha: 0.08, dash: [4, 6], speed: 0.004 },
+        { r: W * 0.44, alpha: 0.04, dash: [2, 12], rSpeed: 0.001 },
+        { r: W * 0.40, alpha: 0.10, dash: [12, 50], rSpeed: -0.004 },
       ]
-
       rings.forEach(ring => {
         ctx.save()
         ctx.translate(cx, cy)
-        ctx.rotate(f * ring.speed)
+        ctx.rotate(f * ring.rSpeed)
         ctx.beginPath()
         ctx.arc(0, 0, ring.r, 0, Math.PI * 2)
         ctx.setLineDash(ring.dash)
-        ctx.strokeStyle = `rgba(${theme.main}, ${ring.alpha})`
+        ctx.strokeStyle = `rgba(${mainStr}, ${ring.alpha})`
         ctx.lineWidth = 1
         ctx.stroke()
         ctx.restore()
@@ -65,39 +129,38 @@ export function Visualizer({ mode }: { mode: VisualizerMode }) {
         const angle = (i / bars) * Math.PI * 2 - Math.PI / 2
         let barH = 0
 
-        if (mode === 'idle') {
-          barH = baseR * 0.04 + Math.sin(f * 0.03 + i * 0.4) * baseR * 0.05
-        } else if (mode === 'listening') {
-          barH = baseR * 0.05 + Math.abs(Math.sin(f * 0.12 + i * 0.3)) * baseR * 0.35 + Math.sin(f * 0.05 + i * 0.8) * baseR * 0.1
-        } else if (mode === 'thinking') {
-          barH = baseR * 0.06 + Math.abs(Math.cos(f * 0.06 + (i % 6) * 1.5)) * baseR * 0.2
-        } else if (mode === 'speaking') {
-          barH = baseR * 0.05 + Math.abs(Math.sin(f * 0.1 + i * 0.15)) * baseR * 0.45
+        if (activeMode === 'listening' && dataArrayRef.current) {
+          const dataIndex = Math.floor((i / bars) * dataArrayRef.current.length * 0.6)
+          const rawValue = dataArrayRef.current[dataIndex] || 0
+          barH = baseR * baseAmp + (rawValue / 255) * baseR * amp * 1.8
+        } else {
+          barH = baseR * baseAmp + Math.sin(f * speed + i * freq) * baseR * amp
+          if (activeMode === 'thinking') {
+            barH = baseR * baseAmp + Math.abs(Math.cos(f * speed + (i % 6) * freq)) * baseR * amp
+          }
         }
+        barH = Math.max(0, barH)
 
         const x1 = cx + Math.cos(angle) * baseR
         const y1 = cy + Math.sin(angle) * baseR
         const x2 = cx + Math.cos(angle) * (baseR + barH)
         const y2 = cy + Math.sin(angle) * (baseR + barH)
-
-        const barAlpha = 0.3 + (barH / (baseR * 0.5)) * 0.7
+        const barAlpha = 0.25 + (barH / (baseR * 0.5)) * 0.75
         
         ctx.beginPath()
         ctx.moveTo(x1, y1)
         ctx.lineTo(x2, y2)
-        ctx.strokeStyle = `rgba(${theme.main}, ${barAlpha})`
-        ctx.lineWidth = 1.5
+        ctx.strokeStyle = `rgba(${mainStr}, ${barAlpha})`
+        ctx.lineWidth = 1.8
         ctx.lineCap = 'round'
-        ctx.setLineDash([])
         ctx.stroke()
       }
 
-      const pulse = 1 + Math.sin(f * 0.06) * 0.025
+      const pulse = 1 + Math.sin(f * 0.05) * 0.02
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseR * pulse)
-      const glowAlpha = mode === 'idle' ? 0.25 : mode === 'listening' ? 0.6 : 0.45
-
-      grad.addColorStop(0, `rgba(${theme.main}, ${glowAlpha})`)
-      grad.addColorStop(0.6, `rgba(${theme.glow}, ${glowAlpha * 0.2})`)
+      const glowAlpha = activeMode === 'idle' ? 0.20 : activeMode === 'listening' ? 0.55 : 0.40
+      grad.addColorStop(0, `rgba(${mainStr}, ${glowAlpha})`)
+      grad.addColorStop(0.6, `rgba(${glowStr}, ${glowAlpha * 0.25})`)
       grad.addColorStop(1, 'transparent')
 
       ctx.beginPath()
@@ -105,37 +168,28 @@ export function Visualizer({ mode }: { mode: VisualizerMode }) {
       ctx.fillStyle = grad
       ctx.fill()
 
-      ctx.beginPath()
-      ctx.arc(cx, cy, baseR * pulse, 0, Math.PI * 2)
-      ctx.strokeStyle = `rgba(${theme.main}, 0.5)`
-      ctx.lineWidth = 1
-      ctx.stroke()
-
-      ctx.font = `bold ${W * 0.08}px monospace`
+      const jitterAlpha = activeMode === 'thinking' && Math.random() > 0.88 ? 0.3 : 0.95
+      ctx.font = `bold ${W * 0.075}px monospace`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillStyle = `rgba(${theme.main}, 0.95)`
-      ctx.fillText(theme.text, cx, cy)
-
-      ctx.font = `${W * 0.055}px monospace`
-      ctx.fillStyle = 'rgba(6, 182, 212, 0.3)'
-      ctx.fillText('v3.5', cx, cy + W * 0.12)
+      ctx.fillStyle = `rgba(${mainStr}, ${jitterAlpha})`
+      ctx.fillText(targetTheme.text, cx, cy)
 
       animRef.current = requestAnimationFrame(draw)
     }
 
     animRef.current = requestAnimationFrame(draw)
-    return () => cancelAnimationFrame(animRef.current)
-  }, [mode])
+    return () => {
+      cancelAnimationFrame(animRef.current)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+      }
+    }
+  }, [])
 
   return (
-    <div className="relative flex items-center justify-center p-2 rounded-full border border-slate-900/60 bg-slate-950/40 shadow-inner">
-      <div className="absolute inset-0 rounded-full bg-cyan-500/0 opacity-0 group-hover:opacity-100 group-hover:bg-cyan-500/2 transition-all duration-700 blur-sm pointer-events-none" />
-      
-      <canvas
-        ref={canvasRef}
-        className="rounded-full select-none pointer-events-none drop-shadow-[0_0_15px_rgba(6,182,212,0.15)]"
-      />
+    <div className="relative flex items-center justify-center p-2 rounded-full border border-red-950/30 bg-red-950/5 group">
+      <canvas ref={canvasRef} className="rounded-full select-none pointer-events-none drop-shadow-[0_0_20px_rgba(245,158,11,0.15)]" />
     </div>
   )
 }

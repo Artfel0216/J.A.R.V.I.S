@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState, useCallback, useTransition } from 'react'
-import { Conversation } from '@/types'
+import { useEffect, useState, useCallback, useTransition, useMemo, useRef, MouseEvent } from 'react'
+import { Conversation, VisualizerMode } from '@/types'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Visualizer } from './Visualizer'
-import { VisualizerMode } from '@/types'
-import { Trash2, Plus, RefreshCw, BarChart3, History, BrainCircuit } from 'lucide-react'
+import { Trash2, Plus, RefreshCw, BarChart3, History, BrainCircuit, Search, Zap } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface Props {
   mode: VisualizerMode
@@ -20,9 +20,76 @@ interface ConvoItem extends Omit<Conversation, 'messages'> {
   messages: { content: string }[]
 }
 
+const playHUDFeedback = (type: 'select' | 'new' | 'delete' | 'overdrive') => {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    
+    if (type === 'new') {
+      osc.frequency.setValueAtTime(1200, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(2400, ctx.currentTime + 0.1)
+    } else if (type === 'overdrive') {
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(100, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(1000, ctx.currentTime + 0.2)
+      gain.gain.setValueAtTime(0.04, ctx.currentTime)
+    } else if (type === 'delete') {
+      osc.frequency.setValueAtTime(800, ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.15)
+    } else {
+      osc.frequency.setValueAtTime(1400, ctx.currentTime)
+    }
+    
+    if (type !== 'overdrive') {
+      osc.type = 'sine'
+      gain.gain.setValueAtTime(0.015, ctx.currentTime)
+    }
+    
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.25)
+  } catch (e) {}
+}
+
+const RadarRing = ({ mode }: { mode: VisualizerMode }) => (
+  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+    <motion.svg 
+      viewBox="0 0 200 200" 
+      className={cn(
+        "w-48 h-48 opacity-20 transition-colors duration-500",
+        mode === 'listening' ? "text-red-500" : "text-amber-500"
+      )}
+      animate={{ rotate: 360 }}
+      transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+    >
+      <circle cx="100" cy="100" r="98" fill="none" stroke="currentColor" strokeWidth="0.5" strokeDasharray="4 8" />
+      <circle cx="100" cy="100" r="80" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="20 180" />
+      <motion.path 
+        d="M 100 2 A 98 98 0 0 1 198 100" 
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="2"
+        animate={{ opacity: [0.2, 0.5, 0.2] }}
+        transition={{ duration: 2, repeat: Infinity }}
+      />
+    </motion.svg>
+    <div className="absolute inset-0 font-mono text-[6px] text-amber-500/20 p-1">
+      <span className="absolute top-0 left-1/2 -translate-x-1/2">000°</span>
+      <span className="absolute right-0 top-1/2 -translate-y-1/2">090°</span>
+      <span className="absolute bottom-0 left-1/2 -translate-x-1/2">180°</span>
+      <span className="absolute left-0 top-1/2 -translate-y-1/2">270°</span>
+    </div>
+  </div>
+)
+
 export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
   const [convos, setConvos] = useState<ConvoItem[]>([])
-  const [metrics, setMetrics] = useState({ cpu: 22, mem: 47, net: 71 })
+  const [metrics, setMetrics] = useState({ cpu: 12, mem: 42, net: 88 })
+  const [isOverdrive, setIsOverdrive] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [isPending, startTransition] = useTransition()
 
   const loadConvos = useCallback(async () => {
@@ -30,174 +97,186 @@ export function Sidebar({ mode, activeId, onSelect, onNew }: Props) {
       const response = await fetch('/api/conversations')
       if (response.ok) {
         const data = await response.json()
-        startTransition(() => {
-          setConvos(data)
-        })
+        startTransition(() => setConvos(data))
       }
-    } catch (error) {
-      console.error('[STARK CLOUD] Falha ao sincronizar logs de dados:', error)
-    }
+    } catch (error) {}
   }, [])
 
-  useEffect(() => {
-    loadConvos()
-  }, [loadConvos, activeId])
+  useEffect(() => { loadConvos() }, [loadConvos, activeId])
 
   useEffect(() => {
+    if (isOverdrive) return 
     const interval = setInterval(() => {
       setMetrics({
-        cpu: Math.round(12 + Math.random() * 23),
-        mem: Math.round(45 + Math.random() * 8),
-        net: Math.round(60 + Math.random() * 25),
+        cpu: Math.round(10 + Math.random() * 15),
+        mem: Math.round(40 + Math.random() * 5),
+        net: Math.round(80 + Math.random() * 15),
       })
-    }, 3000)
+    }, 4000)
     return () => clearInterval(interval)
-  }, [])
+  }, [isOverdrive])
 
-  const deleteConvo = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    
-    setConvos(prev => prev.filter(c => c.id !== id))
-    if (activeId === id) onNew()
-
-    try {
-      await fetch('/api/conversations', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-      })
-    } catch (error) {
-      console.error('[STARK CLOUD] Erro ao deletar registro:', error)
-      loadConvos() 
-    }
+  const triggerOverdrive = () => {
+    if (isOverdrive) return
+    setIsOverdrive(true)
+    playHUDFeedback('overdrive')
+    setMetrics({ cpu: 99, mem: 99, net: 99 })
+    setTimeout(() => setIsOverdrive(false), 2000)
   }
 
+  const filteredConvos = useMemo(() => {
+    return convos.filter(c => 
+      (c.title || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }, [convos, searchQuery])
+
   return (
-    <aside className="w-72 flex flex-col gap-4 p-4 bg-slate-950/30 border-r border-slate-900/60 overflow-y-auto shrink-0 select-none scrollbar-none h-full relative z-20">
+    <aside className="w-72 flex flex-col gap-3 p-4 bg-[#0a0202]/90 border-r border-red-950/40 shrink-0 select-none h-full relative z-20 overflow-hidden">
       
-      <div className="relative p-4 rounded-2xl border border-slate-900/80 bg-slate-950/40 backdrop-blur-xl flex flex-col items-center gap-3 group transition-all duration-300 hover:border-cyan-500/20">
-        <div className="flex items-center gap-1.5 self-start text-[9px] font-mono tracking-[2px] text-cyan-500/60 font-bold uppercase">
-          <BrainCircuit size={12} className="text-cyan-500" />
-          <span>INTERFACE NEURAL</span>
+      <section className="relative p-4 rounded-2xl border border-red-900/20 bg-red-950/5 flex flex-col items-center gap-3 overflow-hidden group shadow-inner">
+        <RadarRing mode={mode} />
+        
+        <div className="flex items-center gap-1.5 self-start text-[9px] font-mono tracking-[3px] text-amber-500/50 font-bold uppercase z-10">
+          <BrainCircuit size={12} className="text-amber-500" />
+          <span>NEURAL_LINK_MK3</span>
         </div>
         
-        <div className="py-2 flex items-center justify-center w-full min-h-22.5">
+        <div className="py-2 flex items-center justify-center w-full min-h-27.5 z-10">
           <Visualizer mode={mode} />
         </div>
 
-        <div className="text-[9px] font-mono text-slate-500 tracking-[3px] uppercase font-semibold flex items-center gap-1.5">
-          <span className={cn(
-            "w-1 h-1 rounded-full",
-            mode === 'idle' && "bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]",
-            mode === 'listening' && "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-ping",
-            mode === 'thinking' && "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] animate-pulse"
-          )} />
-          {mode === 'idle' && 'AGUARDANDO DIRETRIZ'}
-          {mode === 'listening' && 'CAPTANDO BIOMETRIA'}
-          {mode === 'thinking' && 'PROCESSANDO RESPOSTA'}
-          {mode === 'speaking' && 'SINTETIZANDO ÁUDIO'}
+        <div className="text-[9px] font-mono text-red-100/40 tracking-[2px] uppercase z-10">
+          {mode === 'idle' && '[ STATUS: STANDBY ]'}
+          {mode === 'listening' && '[ CAPTANDO BIOMETRIA ]'}
+          {mode === 'thinking' && '[ PROCESSANDO NÚCLEO ]'}
+          {mode === 'speaking' && '[ TRANSMITINDO ÁUDIO ]'}
         </div>
-      </div>
+      </section>
 
-      <div className="p-4 rounded-2xl border border-slate-900/80 bg-slate-950/40 backdrop-blur-xl flex flex-col gap-3.5 transition-all duration-300 hover:border-cyan-500/10">
-        <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[2px] text-cyan-500/60 font-bold uppercase">
-          <BarChart3 size={11} />
-          <span>DIAGNÓSTICO CORE</span>
+      <section 
+        onClick={triggerOverdrive}
+        className={cn(
+          "p-4 rounded-2xl border transition-all duration-500 cursor-pointer flex flex-col gap-3 group relative overflow-hidden shadow-lg",
+          isOverdrive ? "bg-red-600/20 border-red-500 shadow-red-500/20" : "bg-red-950/5 border-red-900/20 hover:border-amber-500/30"
+        )}
+      >
+        {isOverdrive && <motion.div className="absolute inset-0 bg-red-500/10 animate-pulse" />}
+        
+        <div className="flex items-center justify-between z-10">
+          <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[2px] text-amber-500/60 font-bold uppercase">
+            <Zap size={11} className={cn(isOverdrive && "text-red-500 animate-bounce")} />
+            <span>{isOverdrive ? 'CORE_OVERDRIVE_ACTIVE' : 'ARC_REACTOR_DIAG'}</span>
+          </div>
+          {isOverdrive && <span className="text-[8px] font-mono text-red-500 animate-pulse">!! RECALIBRATING !!</span>}
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5 z-10">
           {[
-            { id: 'cpu', label: 'FRAME_RATE_CPU', val: metrics.cpu, color: 'from-blue-600 to-cyan-400' },
-            { id: 'mem', label: 'MEM_SYNAPTIC', val: metrics.mem, color: 'from-cyan-500 to-teal-400' },
-            { id: 'net', label: 'STARK_LINK_NET', val: metrics.net, color: 'from-cyan-500 to-emerald-400' },
+            { label: 'COGNITIVE_LOAD', val: metrics.cpu },
+            { label: 'SYNAPTIC_POOL', val: metrics.mem },
+            { label: 'TOWER_SAT_LINK', val: metrics.net },
           ].map(m => (
-            <div key={m.id} className="group/metric">
-              <div className="flex justify-between text-[10px] font-mono mb-1.5 tracking-wide">
-                <span className="text-slate-500 group-hover/metric:text-slate-400 transition-colors">{m.label}</span>
-                <span className="text-cyan-400 font-bold tabular-nums drop-shadow-[0_0_4px_rgba(6,182,212,0.2)]">{m.val}%</span>
+            <div key={m.label}>
+              <div className="flex justify-between text-[10px] font-mono mb-1 tracking-tighter">
+                <span className="text-red-200/30">{m.label}</span>
+                <span className={cn("font-bold", isOverdrive ? "text-red-500" : "text-amber-400")}>{m.val}%</span>
               </div>
-              <div className="h-1 bg-slate-950 border border-slate-900/60 rounded-full overflow-hidden p-[0.5px]">
-                <div 
-                  className={cn("h-full rounded-full transition-all duration-1000 ease-out bg-linear-to-r", m.color)}
-                  style={{ width: `${m.val}%` }} 
+              <div className="h-1 bg-black rounded-full overflow-hidden border border-red-950/50">
+                <motion.div 
+                  initial={false}
+                  animate={{ width: `${m.val}%`, backgroundColor: isOverdrive ? '#ef4444' : '#f59e0b' }}
+                  className="h-full shadow-[0_0_8px_rgba(245,158,11,0.4)]"
                 />
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      <div className="p-4 rounded-2xl border border-slate-900/80 bg-slate-950/40 backdrop-blur-xl flex-1 flex flex-col min-h-0 transition-all duration-300 hover:border-cyan-500/10">
-        <div className="flex items-center justify-between mb-3.5 shrink-0">
-          <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[2px] text-cyan-500/60 font-bold uppercase">
+      <section className="flex-1 flex flex-col min-h-0 p-4 rounded-2xl border border-red-900/20 bg-red-950/5 backdrop-blur-xl transition-all duration-300 hover:border-amber-500/10 shadow-md">
+        <div className="flex items-center justify-between mb-4 shrink-0">
+          <div className="flex items-center gap-1.5 text-[9px] font-mono tracking-[2px] text-amber-500/60 font-bold uppercase">
             <History size={11} />
-            <span>HISTÓRICO_LOG</span>
+            <span>SECURE_LOGS</span>
           </div>
-          <button 
-            onClick={onNew} 
-            className="text-[9px] font-mono font-bold tracking-widest text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-500/5 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 active:scale-95"
-            title="Inicializar Nova Sequência"
+          <motion.button 
+            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+            onClick={() => { playHUDFeedback('new'); onNew(); }} 
+            className="text-[9px] font-mono font-bold text-amber-400 border border-amber-500/20 hover:bg-amber-500/10 px-2.5 py-1 rounded-lg"
           >
-            <Plus size={10} /> NOVA
-          </button>
+            <Plus size={10} className="inline mr-1" /> NOVA
+          </motion.button>
         </div>
 
-        <div className="flex-1 overflow-y-auto flex flex-col gap-2 pr-1 scrollbar-thin scrollbar-thumb-slate-900 scrollbar-track-transparent">
-          {isPending && convos.length === 0 && (
-            <div className="flex items-center justify-center py-6 text-slate-600 animate-spin">
-              <RefreshCw size={14} />
-            </div>
-          )}
-
-          {convos.length === 0 && !isPending && (
-            <div className="text-[10px] font-mono text-slate-600 text-center py-6 italic border border-dashed border-slate-900 rounded-xl">
-              NENHUM REGISTRO ENCONTRADO
-            </div>
-          )}
-
-          {convos.map(c => {
-            const isSelected = activeId === c.id
-            
-            const safeDate = typeof c.updatedAt === 'string' ? parseISO(c.updatedAt) : new Date(c.updatedAt)
-
-            return (
-              <div
-                key={c.id}
-                onClick={() => onSelect(c.id)}
-                className={cn(
-                  'group relative flex flex-col gap-1 p-3 rounded-xl cursor-pointer border transition-all duration-300 text-left select-none overflow-hidden',
-                  isSelected
-                    ? 'border-cyan-500/30 bg-cyan-950/10 shadow-[0_0_15px_rgba(6,182,212,0.05)]'
-                    : 'border-slate-900/60 hover:border-slate-800 hover:bg-slate-900/20'
-                )}
-              >
-                {isSelected && (
-                  <div className="absolute left-0 top-3 bottom-3 w-0.5 bg-cyan-400 rounded-r shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
-                )}
-
-                <div className={cn(
-                  "text-[11px] font-mono font-medium truncate pr-6 tracking-wide transition-colors",
-                  isSelected ? "text-cyan-400" : "text-slate-300 group-hover:text-slate-200"
-                )}>
-                  {c.title || 'Diretriz sem Título'}
-                </div>
-                
-                <div className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">
-                  {formatDistanceToNow(safeDate, { addSuffix: true, locale: ptBR })}
-                </div>
-
-                <button
-                  onClick={(e) => deleteConvo(c.id, e)}
-                  className="absolute right-2.5 top-[50%] translate-y-[-50%] opacity-0 group-hover:opacity-100 p-1.5 rounded-lg border border-transparent text-slate-600 hover:text-red-400 hover:border-red-500/20 hover:bg-red-950/20 transition-all duration-200"
-                  title="Expurgar Registro"
-                >
-                  <Trash2 size={11} />
-                </button>
-              </div>
-            )
-          })}
+        <div className="relative mb-3 group shrink-0">
+          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-amber-500/40 group-focus-within:text-amber-400 transition-colors">
+            <Search size={10} />
+          </div>
+          <input 
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="// SEARCH_LOG:"
+            className="w-full bg-red-950/20 border border-red-900/30 rounded-lg py-2 pl-8 pr-2 text-[10px] font-mono text-amber-100 placeholder:text-red-900 focus:outline-none focus:border-amber-500/50 focus:bg-red-950/40 transition-all"
+          />
         </div>
-      </div>
+
+        <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-amber-600/20 hover:scrollbar-thumb-amber-500/40 scrollbar-track-transparent">
+          <div className="flex flex-col gap-2 relative">
+            <AnimatePresence mode="popLayout">
+              {filteredConvos.map(c => {
+                const isSelected = activeId === c.id
+                function handleDelete(id: string, e: MouseEvent<HTMLButtonElement>) {
+                  (async () => {
+                    try {
+                      startTransition(() => setConvos(prev => prev.filter(x => x.id !== id)))
+
+                      const res = await fetch(`/api/conversations/${id}`, { method: 'DELETE' })
+                      if (!res.ok) {
+                        await loadConvos()
+                      }
+                    } catch (err) {
+                      await loadConvos()
+                    }
+                  })()
+                }
+
+                return (
+                  <motion.div
+                    layout
+                    key={c.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    onClick={() => { playHUDFeedback('select'); onSelect(c.id); }}
+                    className={cn(
+                      'group relative flex flex-col gap-1 p-3 rounded-xl cursor-pointer border transition-all duration-300',
+                      isSelected ? 'border-amber-500/40 bg-amber-950/10' : 'border-red-950/40 hover:border-red-900/40 hover:bg-red-950/10'
+                    )}
+                  >
+                    {isSelected && <motion.div layoutId="active" className="absolute left-0 top-3 bottom-3 w-0.5 bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]" />}
+                    
+                    <div className={cn("text-[11px] font-mono truncate pr-6 tracking-wide", isSelected ? "text-amber-400 font-bold" : "text-red-100/70 group-hover:text-red-100/90")}>
+                      {c.title || 'DIRETRIZ_SEM_TÍTULO'}
+                    </div>
+                    
+                    <div className="text-[8px] font-mono text-red-900/60 uppercase tracking-[1.5px]">
+                      {formatDistanceToNow(parseISO(c.updatedAt as string), { addSuffix: true, locale: ptBR })}
+                    </div>
+
+                    <button
+                      onClick={(e) => { e.stopPropagation(); playHUDFeedback('delete'); handleDelete(c.id, e); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 text-red-900/50 hover:text-red-500 transition-all"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
+          </div>
+        </div>
+      </section>
     </aside>
   )
 }
