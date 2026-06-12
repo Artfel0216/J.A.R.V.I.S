@@ -74,6 +74,51 @@ const DEFAULT_PERSONA =
   '- "Jarvis, protocolo tábula rasa" — ativa auto-destruição de dados.\n\n' +
   'Use suas ferramentas sempre que forem úteis em vez de adivinhar respostas.'
 
+let requestQueue: Promise<void> = Promise.resolve()
+const MIN_REQUEST_INTERVAL = 3500
+
+function getErrorStatus(error: any): number | null {
+  if (error?.status && typeof error.status === 'number') return error.status
+  if (error?.code && typeof error.code === 'number') return error.code
+  if (typeof error === 'object' && error?.response?.status) return error.response.status
+  return null
+}
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 5): Promise<T> {
+  let queueDone: () => void
+  const myTurn = new Promise<void>(resolve => { queueDone = resolve })
+  const prevQueue = requestQueue
+  requestQueue = myTurn
+
+  await prevQueue
+
+  try {
+    const now = Date.now()
+    const elapsed = now - (globalThis as any).__lastGeminiTime || 0
+    if (elapsed < MIN_REQUEST_INTERVAL) {
+      await new Promise(r => setTimeout(r, MIN_REQUEST_INTERVAL - elapsed))
+    }
+  } finally {
+    (globalThis as any).__lastGeminiTime = Date.now()
+    queueDone!()
+  }
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn()
+    } catch (error: any) {
+      const status = getErrorStatus(error)
+      if (status === 429 && attempt < retries) {
+        const delay = Math.min(2000 * Math.pow(2, attempt) + Math.random() * 2000, 30000)
+        await new Promise(r => setTimeout(r, delay))
+        continue
+      }
+      throw error
+    }
+  }
+  throw new Error('Exceeded retry limit')
+}
+
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY
@@ -127,7 +172,7 @@ export async function POST(req: Request) {
 
     const encoder = new TextEncoder()
 
-    const result = await model.generateContent({ contents })
+    const result = await withRetry(() => model.generateContent({ contents }))
     const response = result.response
     const functionCalls = response.functionCalls()
 
@@ -144,7 +189,7 @@ export async function POST(req: Request) {
       contents.push({ role: 'function', parts: responseParts })
     }
 
-    const streamResult = await model.generateContentStream({ contents })
+    const streamResult = await withRetry(() => model.generateContentStream({ contents }))
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -159,7 +204,6 @@ export async function POST(req: Request) {
           const doneData = JSON.stringify({ type: 'done' })
           controller.enqueue(encoder.encode(`data: ${doneData}\n\n`))
         } catch (streamError: any) {
-          console.error('[STREAM ERROR]', streamError)
           const errorData = JSON.stringify({ type: 'error', content: streamError.message })
           controller.enqueue(encoder.encode(`data: ${errorData}\n\n`))
         } finally {
@@ -178,7 +222,6 @@ export async function POST(req: Request) {
     })
 
   } catch (error: any) {
-    console.error('[GEMINI ROUTE ERROR]', error)
     const status = error.status || 500
     const message = status === 429
       ? 'Limite de requisições atingido. O J.A.R.V.I.S. precisa descansar por alguns segundos.'

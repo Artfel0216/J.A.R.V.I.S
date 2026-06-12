@@ -97,7 +97,12 @@ export function useChat(initialConversationId?: string) {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => null)
-        throw new Error(errorData?.error || `Erro de comunicação com o servidor (${res.status})`)
+        const status = res.status
+        const errMsg = errorData?.error || `Erro de comunicação com o servidor (${status})`
+        if (status === 429) {
+          throw Object.assign(new Error(errMsg), { status: 429 })
+        }
+        throw new Error(errMsg)
       }
 
       const reader = res.body?.getReader()
@@ -126,9 +131,30 @@ export function useChat(initialConversationId?: string) {
       }
     } catch (err: unknown) {
       if ((err as Error).name !== 'AbortError') {
-        console.error('[STARK MAIN_FRAME] Erro no pipeline de IA:', err)
+        if ((err as any)?.status === 429) {
+          setMessages(prev => prev.filter(m => m.id !== assistantId))
+          setIsLoading(false)
+          const delays = [5000, 10000, 20000]
+          for (const delay of delays) {
+            await new Promise(r => setTimeout(r, delay))
+            if (abortRef.current?.signal.aborted) return
+            try {
+              await sendMessage(content)
+              return
+            } catch (retryErr: any) {
+              if (retryErr?.status !== 429) {
+                const retryMsg = retryErr.message
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantId
+                    ? { ...m, content: `Sistemas sobrecarregados. Nota: ${retryMsg}` }
+                    : m
+                ))
+                return
+              }
+            }
+          }
+        }
         const errorMessage = (err as Error).message
-        
         setMessages(prev => prev.map(m =>
           m.id === assistantId
             ? { ...m, content: `Sistemas sobrecarregados. Nota: ${errorMessage}` }
