@@ -106,7 +106,7 @@ export function Visualizer({ mode }: { mode: VisualizerMode }) {
         analyserRef.current.getByteFrequencyData(dataArrayRef.current)
       }
 
-      // Anéis Periféricos
+      
       const rings = [
         { r: W * 0.44, alpha: 0.04, dash: [2, 12], rSpeed: 0.001 },
         { r: W * 0.40, alpha: 0.10, dash: [12, 50], rSpeed: -0.004 },

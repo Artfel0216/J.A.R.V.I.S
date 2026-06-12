@@ -1,4 +1,4 @@
-// hooks/useHealthCheck.ts
+
 import { useState, useEffect } from 'react';
 
 export function useHealthCheck(intervalMs = 15000) {

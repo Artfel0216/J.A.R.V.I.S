@@ -1,4 +1,4 @@
-/* J.A.R.V.I.S. — animations.css — Keyframes e Transições */
+
 
 @keyframes gridPulse {
   0%, 100% { opacity: 0.6; }
@@ -61,7 +61,7 @@
   100% { background-position: 0% 50%; }
 }
 
-/* Efeito de glitch no logo */
+
 @keyframes glitch {
   0%, 90%, 100% { transform: none; filter: none; }
   91%  { transform: translate(-2px, 0); filter: hue-rotate(90deg); }
@@ -74,7 +74,7 @@
   animation: glitch 8s ease-in-out infinite;
 }
 
-/* Entrada dos painéis laterais */
+
 #sidebar .panel {
   animation: panelIn 0.4s ease-out both;
 }
@@ -83,13 +83,13 @@
 #sidebar .panel:nth-child(2) { animation-delay: 0.2s; }
 #sidebar .panel:nth-child(3) { animation-delay: 0.3s; }
 
-/* Hover nos painéis */
+
 .panel:hover {
   border-color: rgba(0,212,255,0.4);
   transition: border-color 0.3s;
 }
 
-/* Pulsação do anel do visualizador */
+
 @keyframes ringPulse {
   0%, 100% { box-shadow: 0 0 20px rgba(0,212,255,0.15); }
   50%       { box-shadow: 0 0 35px rgba(0,212,255,0.35); }

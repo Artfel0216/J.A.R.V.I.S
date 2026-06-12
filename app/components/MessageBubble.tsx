@@ -188,7 +188,7 @@ const MessageBubbleComponent = ({ message }: { message: Message }) => {
                     em: ({ children }) => (
                       <em className="text-red-300 italic">{children}</em>
                     ),
-                    // 5. Terminal de Código Otimizado e Tematizado
+                    
                     code({ node, inline, className, children, ...props }: any) {
                       const match = /language-(\w+)/.exec(className || '')
                       return !inline && match ? (

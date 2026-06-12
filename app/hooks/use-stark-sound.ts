@@ -44,7 +44,7 @@ class StarkSoundSystem {
 
     const now = this.ctx.currentTime
     
-    // Primeiro bipe de ativação
+    
     this.triggerTone(1200, 'triangle', 0.03, now, 0.06)
     this.triggerTone(1800, 'sine', 0.04, now + 0.03, 0.04)
   }

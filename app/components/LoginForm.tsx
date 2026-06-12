@@ -33,7 +33,7 @@ export function LoginForm() {
         return
       }
 
-      // 🚀 OTIMIZAÇÃO: Prefetch da rota home antes do push para transição instantânea
+      
       router.prefetch('/')
       router.push('/')
       router.refresh()
@@ -50,14 +50,14 @@ export function LoginForm() {
       error && "border-red-500/40 shadow-[0_0_40px_rgba(239,68,68,0.1)]"
     )}>
       
-      {/* Laser Decorativo Superior de Varredura */}
+      {}
       <div className={cn(
         "absolute top-0 left-6 right-6 h-px transition-all duration-500",
         isLoading ? "bg-cyan-400 animate-pulse" : "bg-slate-800",
         error && "bg-red-500"
       )} />
 
-      {/* CABEÇALHO DO TERMINAL DE SEGURANÇA */}
+      {}
       <div className="text-center mb-8 select-none">
         <div className="w-12 h-12 rounded-xl border border-cyan-500/20 bg-cyan-950/10 flex items-center justify-center mx-auto mb-4 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.1)] animate-pulse">
           <KeyRound size={20} />
@@ -73,7 +73,7 @@ export function LoginForm() {
         </p>
       </div>
 
-      {/* FORMULÁRIO DE DIRETRIZES */}
+      {}
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="block text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase mb-2">
@@ -109,7 +109,7 @@ export function LoginForm() {
           />
         </div>
 
-        {/* MENSAGEM DE ERRO HOLOGRÁFICA */}
+        {}
         {error && (
           <div className="p-3.5 bg-red-950/20 border border-red-500/30 rounded-xl text-red-400 text-xs font-mono flex items-start gap-2.5 animate-[fadeIn_0.3s_ease-out]">
             <ShieldAlert size={16} className="shrink-0 mt-0.5" />
@@ -117,7 +117,7 @@ export function LoginForm() {
           </div>
         )}
 
-        {/* BOTÃO DE ACIONAMENTO CORE */}
+        {}
         <button
           type="submit"
           disabled={isLoading}
@@ -141,7 +141,7 @@ export function LoginForm() {
           )}
         </button>
 
-        {/* NOTA DE RODAPÉ DO REPOSITÓRIO SECRETO */}
+        {}
         <div className="pt-4 border-t border-slate-900/80 flex items-start gap-2 text-[9px] font-mono text-slate-500 leading-relaxed">
           <Terminal size={14} className="text-slate-700 shrink-0 mt-0.5" />
           <p>

@@ -1,6 +1,6 @@
-/* J.A.R.V.I.S. — hud.css — Interface Holográfica */
 
-/* ── Layout Principal ──────────────────────────────────── */
+
+
 #app {
   display: grid;
   grid-template-rows: auto 1fr auto;
@@ -15,7 +15,7 @@
   overflow: hidden;
 }
 
-/* ── Background Grid ───────────────────────────────────── */
+
 #bg-grid {
   position: fixed;
   inset: 0;
@@ -29,7 +29,7 @@
   animation: gridPulse 8s ease-in-out infinite;
 }
 
-/* ── Scanlines ─────────────────────────────────────────── */
+
 #scanlines {
   position: fixed;
   inset: 0;
@@ -44,7 +44,7 @@
   );
 }
 
-/* ── Header ────────────────────────────────────────────── */
+
 #header {
   grid-area: header;
   z-index: 10;
@@ -129,7 +129,7 @@
   text-align: right;
 }
 
-/* ── Sidebar ───────────────────────────────────────────── */
+
 #sidebar {
   grid-area: sidebar;
   z-index: 5;
@@ -170,7 +170,7 @@
   text-transform: uppercase;
 }
 
-/* ── Visualizador ──────────────────────────────────────── */
+
 #visualizer-wrap {
   display: flex;
   flex-direction: column;
@@ -194,7 +194,7 @@
   text-align: center;
 }
 
-/* ── Métricas do Sistema ───────────────────────────────── */
+
 .metric-row {
   display: flex;
   flex-direction: column;
@@ -234,7 +234,7 @@
   transition: width 1s ease;
 }
 
-/* ── Info Rápida ───────────────────────────────────────── */
+
 .info-list {
   display: flex;
   flex-direction: column;
@@ -254,7 +254,7 @@
 .info-key { color: var(--text-dim); }
 .info-val { color: var(--cyan); }
 
-/* ── Main Chat Area ────────────────────────────────────── */
+
 #main {
   grid-area: main;
   z-index: 5;
@@ -264,7 +264,7 @@
   position: relative;
 }
 
-/* ── Chat Messages ─────────────────────────────────────── */
+
 #chat-container {
   flex: 1;
   overflow-y: auto;
@@ -358,7 +358,7 @@
   color: var(--cyan);
 }
 
-/* Typing indicator */
+
 .typing-dots {
   display: flex;
   gap: 5px;
@@ -377,7 +377,7 @@
 .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
 .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
 
-/* Cursor de escrita */
+
 .cursor {
   display: inline-block;
   width: 2px;
@@ -388,7 +388,7 @@
   animation: cursorBlink 0.8s step-end infinite;
 }
 
-/* ── Footer / Input ─────────────────────────────────────── */
+
 #footer {
   grid-area: footer;
   z-index: 10;
@@ -490,7 +490,7 @@
   letter-spacing: 1px;
 }
 
-/* ── Boot Screen ───────────────────────────────────────── */
+
 #boot-screen {
   position: fixed;
   inset: 0;
