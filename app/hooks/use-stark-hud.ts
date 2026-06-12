@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 interface UseStarkHUDProps {
   isLoading: boolean
   setIsLoading: (loading: boolean) => void
-  onSubmit?: (message: string) => Promise<void> | void
+  onSubmit?: (message: string, image?: string) => Promise<void> | void
   onStreamStart?: () => void
   onError?: (error: string) => void
 }
@@ -18,6 +18,7 @@ export function useStarkHUD({
   onError
 }: UseStarkHUDProps) {
   const [value, setValue] = useState('')
+  const [image, setImage] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -35,16 +36,18 @@ export function useStarkHUD({
   }
 
   const handleSend = async () => {
-    if (!value.trim() || isLoading) return
+    if ((!value.trim() && !image) || isLoading) return
 
     const currentMessage = value.trim()
+    const currentImage = image
     setIsLoading(true)
     onStreamStart?.()
     triggerHaptic(30)
 
     try {
-      await onSubmit?.(currentMessage)
-      setValue('') 
+      await onSubmit?.(currentMessage, currentImage ?? undefined)
+      setValue('')
+      setImage(null)
     } catch (err) {
       console.error('[Stark OS Error]:', err)
       const errorMessage = err instanceof Error ? err.message : 'Falha no processador central.'
@@ -65,6 +68,8 @@ export function useStarkHUD({
   return {
     value,
     setValue,
+    image,
+    setImage,
     textareaRef,
     handleSend,
     handleKey,

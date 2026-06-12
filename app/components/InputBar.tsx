@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { Mic, MicOff, Send, Volume2, VolumeX, Square, Loader2 } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Mic, MicOff, Send, Volume2, VolumeX, Square, Loader2, ImagePlus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStarkHUD } from '@/hooks/use-stark-hud'
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024 // 4 MB
 
 interface Props {
   conversationId?: string | null
@@ -34,10 +36,13 @@ export function InputBar({
 }: Props) {
 
   const [isLoading, setIsLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
     value,
     setValue,
+    image,
+    setImage,
     textareaRef,
     handleSend,
     handleKey,
@@ -47,9 +52,32 @@ export function InputBar({
   const handleAbortAction = () => {
     onAbort?.()
     setIsLoading(false)
-    triggerHaptic(50) 
+    triggerHaptic(50)
     onError?.('Diretriz interrompida pelo Operador.')
   }
+
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite re-selecionar o mesmo arquivo
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      onError?.('Apenas imagens são suportadas.')
+      return
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      onError?.('Imagem muito grande (máx. 4 MB).')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      triggerHaptic(15)
+      setImage(reader.result as string)
+    }
+    reader.onerror = () => onError?.('Falha ao ler a imagem.')
+    reader.readAsDataURL(file)
+  }
+
+  const canSend = !!value.trim() || !!image
 
   return (
     <footer className="w-full max-w-5xl mx-auto px-4 py-6 transition-all duration-500">
@@ -64,6 +92,30 @@ export function InputBar({
         {isLoading && (
           <div className="absolute top-0 left-4 right-4 h-px bg-linear-to-r from-transparent via-amber-400 to-transparent animate-pulse" />
         )}
+
+        {/* Preview da imagem anexada */}
+        {image && (
+          <div className="mb-3 flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-950/10 p-2 w-fit">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image} alt="Anexo" className="h-14 w-14 rounded-lg object-cover border border-red-900/50" />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-amber-500/80">Imagem anexada</span>
+            <button
+              onClick={() => { triggerHaptic(15); setImage(null) }}
+              aria-label="Remover imagem"
+              className="ml-1 p-1 text-red-400/70 hover:text-red-400 hover:bg-red-900/30 rounded transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFilePick}
+          className="hidden"
+        />
 
         <div className="flex items-end gap-3">
           {/* Botão de Microfone */}
@@ -84,6 +136,22 @@ export function InputBar({
               <span className="absolute inset-0 rounded-xl bg-red-500/10 animate-ping opacity-75" />
             )}
             {isListening ? <MicOff size={18} className="animate-pulse" /> : <Mic size={18} />}
+          </button>
+
+          {/* Botão de Anexar Imagem (galeria/câmera) */}
+          <button
+            onClick={() => { triggerHaptic(15); fileInputRef.current?.click() }}
+            disabled={isLoading}
+            aria-label="Anexar imagem para análise"
+            title="Anexar imagem (análise visual)"
+            className={cn(
+              'w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 border bg-red-950/20 mb-0.5',
+              'border-red-900/40 text-red-700 hover:border-amber-500/60 hover:text-amber-500 hover:scale-105 active:scale-95',
+              image && 'border-amber-500/60 text-amber-500',
+              isLoading && 'opacity-20 cursor-not-allowed'
+            )}
+          >
+            <ImagePlus size={18} />
           </button>
 
           <div className="relative flex-1 flex items-center">
@@ -134,11 +202,11 @@ export function InputBar({
           ) : (
             <button
               onClick={handleSend}
-              disabled={!value.trim()}
+              disabled={!canSend}
               aria-label="Enviar comando de inicialização"
               className={cn(
                 "h-12 px-5 font-mono text-xs tracking-widest transition-all duration-300 flex items-center gap-2 shrink-0 rounded-xl border bg-red-950/20 active:scale-95 mb-0.5",
-                value.trim()
+                canSend
                   ? "border-amber-500 text-amber-500 hover:bg-amber-500/10 hover:shadow-[0_0_20px_rgba(245,158,11,0.2)]"
                   : "border-red-950 text-red-950 cursor-not-allowed opacity-40"
               )}

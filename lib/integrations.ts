@@ -130,9 +130,71 @@ export async function wolframQuery(query: string): Promise<WolframResponse | Too
   }
 }
 
+export interface ResearchResponse {
+  summary: string
+  sources: Array<{ title: string; url: string }>
+  error?: never
+}
+
+export interface BriefingResponse {
+  date: string
+  weather: string
+  news: string[]
+  greeting: string
+  error?: never
+}
+
 export type IntegrationResult = {
   type: 'weather' | 'news' | 'search' | 'wolfram' | 'none'
   data: Record<string, any>
+}
+
+export async function dailyBriefing(city?: string): Promise<BriefingResponse | { error: string }> {
+  const today = new Date().toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo',
+  })
+
+  const weatherData = await getWeather(city || 'São Paulo')
+  const weatherInfo = 'error' in weatherData
+    ? 'Indisponível'
+    : `${weatherData.city}: ${weatherData.temp}°C, ${weatherData.description}. Máx/Mín: sensação ${weatherData.feels_like}°C, umidade ${weatherData.humidity}%, vento ${weatherData.wind} km/h`
+
+  const newsData = await getNews('brasil')
+  const newsItems = 'error' in newsData
+    ? ['Indisponível']
+    : newsData.articles.map(a => `${a.title} (${a.source})`)
+
+  const hour = new Date().getHours()
+  const greeting = hour < 6 ? 'Boa madrugada' : hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+
+  return {
+    date: today,
+    weather: weatherInfo,
+    news: newsItems,
+    greeting,
+  }
+}
+
+export async function researchQuery(topic: string): Promise<ResearchResponse | { error: string }> {
+  const results = await searchWeb(topic)
+  if ('error' in results) {
+    if (results.error) return { error: results.error }
+    return { error: 'Erro desconhecido na pesquisa.' }
+  }
+
+  if (!results.results.length) {
+    return { summary: `Nenhum resultado encontrado para "${topic}".`, sources: [] }
+  }
+
+  const sources = results.results.map(r => ({ title: r.title, url: r.link }))
+  const snippets = results.results.map(r => r.snippet).filter(Boolean).join(' ')
+  const summary = `Pesquisa sobre "${topic}":\n${snippets}`
+
+  return { summary, sources }
 }
 
 export async function resolveIntegration(message: string): Promise<IntegrationResult> {

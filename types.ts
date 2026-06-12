@@ -7,6 +7,8 @@ export interface Message {
   role: MessageRole
   content: string
   createdAt: string | Date
+  /** Data URL (base64) de uma imagem anexada pelo usuário, quando houver. */
+  image?: string
 }
 
 export interface Conversation {

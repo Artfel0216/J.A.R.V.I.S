@@ -10,6 +10,7 @@ import { Sidebar } from './Sidebar'
 import { MessageBubble } from './MessageBubble'
 import { InputBar } from './InputBar'
 import { BootScreen } from './BootScreen'
+import { SmartHomePanel } from './SmartHomePanel'
 import { VisualizerMode } from '@/types'
 
 function useHealthCheck(intervalMs = 15000) {
@@ -200,6 +201,8 @@ export function JarvisDashboard({ session }: { session: Session | null }) {
       {!booted && <BootScreen onDone={() => setBooted(true)} />}
 
       <BackgroundHologram />
+
+      <SmartHomePanel />
 
       <AnimatePresence>
         {booted && (
