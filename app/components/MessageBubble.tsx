@@ -64,11 +64,56 @@ const MessageBubbleComponent = ({ message }: { message: Message }) => {
     setTimeout(() => setCopied(false), 2000)
   }, [message.content])
 
-  const handleSpeak = useCallback(() => {
+  const handleSpeak = useCallback(async () => {
     playActionBeep()
-    const utterance = new SpeechSynthesisUtterance(message.content)
+    const cleanText = message.content
+      .replace(/#{1,6}\s?/g, '')
+      .replace(/\*\*(.*?)\*\*/g, '$1')
+      .replace(/\*(.*?)\*/g, '$1')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/[-*+]\s/g, '')
+      .replace(/\n{2,}/g, '. ')
+      .replace(/\n+/g, ' ')
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/[<>]/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanText, voiceId: '21m00Tcm4TlvDq8ikWAM' }),
+      })
+      if (res.ok) {
+        const blob = await res.blob()
+        if (blob && blob.size > 0) {
+          const url = URL.createObjectURL(blob)
+          const audio = new Audio(url)
+          audio.onended = () => URL.revokeObjectURL(url)
+          await audio.play().catch(() => {})
+          return
+        }
+      }
+    } catch {}
+
+    const synth = window.speechSynthesis
+    const voices = synth.getVoices()
+    const voice =
+      voices.find((v) => v.lang === 'pt-BR' && v.name.includes('Google')) ||
+      voices.find((v) => v.lang === 'pt-BR' && !v.name.includes('Microsoft')) ||
+      voices.find((v) => v.lang === 'pt-BR') ||
+      voices.find((v) => v.lang === 'en-GB') ||
+      voices[0]
+
+    const utterance = new SpeechSynthesisUtterance(cleanText)
+    utterance.voice = voice || null
     utterance.lang = 'pt-BR'
-    window.speechSynthesis.speak(utterance)
+    utterance.rate = 1.25
+    utterance.pitch = 0.95
+    utterance.volume = 1.0
+    synth.speak(utterance)
   }, [message.content])
 
   return (

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { speakWithElevenLabs, speakWithWebSpeech } from '@/lib/tts-engine'
 
 interface SpeechRecognitionResult {
   readonly length: number;
@@ -35,17 +36,10 @@ interface SpeechRecognition extends EventTarget {
   abort(): void;
 }
 
-// Estendendo o objeto Window global para o compilador aceitar as propriedades com prefixo
 declare global {
   interface Window {
-    SpeechRecognition?: {
-      prototype: SpeechRecognition;
-      new (): SpeechRecognition;
-    };
-    webkitSpeechRecognition?: {
-      prototype: SpeechRecognition;
-      new (): SpeechRecognition;
-    };
+    SpeechRecognition?: { prototype: SpeechRecognition; new (): SpeechRecognition }
+    webkitSpeechRecognition?: { prototype: SpeechRecognition; new (): SpeechRecognition }
   }
 }
 
@@ -53,115 +47,53 @@ export function useSpeech() {
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isSupported, setIsSupported] = useState(false)
-  
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
-  const synthRef = useRef<SpeechSynthesis | null>(null)
-  const voiceRef = useRef<SpeechSynthesisVoice | null>(null)
 
-  const sanitizeTextForTTS = useCallback((text: string): string => {
-    return text
-      .replace(/#{1,6}\s?/g, '')       
-      .replace(/\*\*(.*?)\*\*/g, '$1') 
-      .replace(/\*(.*?)\*/g, '$1')     
-      .replace(/`([^`]+)`/g, '$1')     
-      .replace(/```[\s\S]*?```/g, '')  
-      .replace(/[-*+]\s/g, '')         
-      .replace(/\n+/g, ' ')            
-      .trim()
-  }, [])
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     setIsSupported(!!SR)
-    
-    const synth = window.speechSynthesis
-    synthRef.current = synth
-
-    const loadVoices = () => {
-      if (!synth) return
-      const voices = synth.getVoices()
-      
-      voiceRef.current =
-        voices.find((v) => v.lang === 'pt-BR' && v.name.includes('Google')) || 
-        voices.find((v) => v.lang === 'pt-BR') ||
-        voices.find((v) => v.lang.startsWith('pt')) ||
-        voices.find((v) => v.lang === 'en-GB') ||
-        voices[0] || 
-        null
-    }
-
-    if (synth) {
-      loadVoices()
-      if (synth.addEventListener) {
-        synth.addEventListener('voiceschanged', loadVoices)
-      } else {
-        synth.onvoiceschanged = loadVoices
-      }
-    }
-
-    return () => {
-      if (synth && synth.removeEventListener) {
-        synth.removeEventListener('voiceschanged', loadVoices)
-      }
-    }
   }, [])
 
-  const speak = useCallback((text: string, onEnd?: () => void) => {
-    if (!synthRef.current) return
-    
-    synthRef.current.cancel()
-
-    const cleanText = sanitizeTextForTTS(text)
-    if (!cleanText) {
-      onEnd?.()
-      return
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.speechSynthesis.cancel()
     }
+    setIsSpeaking(false)
+  }, [])
 
-    const utterance = new SpeechSynthesisUtterance(cleanText)
-    utterance.voice = voiceRef.current
-    
-    utterance.rate = 0.98  
-    utterance.pitch = 0.82 
-    utterance.volume = 1.0 
-    utterance.lang = voiceRef.current?.lang || 'pt-BR'
+  const speak = useCallback(async (text: string, onEnd?: () => void) => {
+    stopSpeaking()
 
-    utterance.onstart = () => setIsSpeaking(true)
-    
-    const handleSpeechEnd = () => {
+    const handleEnd = () => {
       setIsSpeaking(false)
       onEnd?.()
     }
 
-    utterance.onend = handleSpeechEnd
-    utterance.onerror = () => handleSpeechEnd()
+    setIsSpeaking(true)
 
-    synthRef.current.speak(utterance)
-  }, [sanitizeTextForTTS])
+    const ok = await speakWithElevenLabs(text, '21m00Tcm4TlvDq8ikWAM')
 
-  const stopSpeaking = useCallback(() => {
-    if (synthRef.current) {
-      synthRef.current.cancel()
+    if (ok) {
+      setIsSpeaking(false)
+      onEnd?.()
+    } else {
+      speakWithWebSpeech(text, handleEnd)
     }
-    setIsSpeaking(false)
-  }, [])
+  }, [stopSpeaking])
 
   const startListening = useCallback((
     onResult: (text: string, isFinal: boolean) => void,
     onEnd?: () => void
   ) => {
     if (typeof window === 'undefined') return
-    
+
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
 
     if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort()
-      } catch {
-        // Ignora se o motor já estava parado
-      }
+      try { recognitionRef.current.abort() } catch { }
     }
 
     const rec = new SR()
@@ -169,13 +101,10 @@ export function useSpeech() {
     rec.continuous = false
     rec.interimResults = true
 
-    // 🛡️ CORREÇÃO: Tipando explicitamente o parâmetro 'event' para evitar erro de implicit any
     rec.onresult = (event: SpeechRecognitionEvent) => {
-      // 🛡️ CORREÇÃO: Array.from agora sabe exatamente o formato do objeto mapeado, sumindo o erro de 'unknown'
       const transcript = Array.from(event.results)
         .map((result: SpeechRecognitionResult) => result[0].transcript)
         .join('')
-      
       const isFinal = event.results[event.results.length - 1].isFinal
       onResult(transcript, isFinal)
     }
@@ -192,8 +121,7 @@ export function useSpeech() {
       rec.start()
       recognitionRef.current = rec
       setIsListening(true)
-    } catch (error) {
-      console.error('[STARK VAD] Falha ao inicializar periférico de captura:', error)
+    } catch {
       setIsListening(false)
     }
   }, [])
@@ -205,13 +133,13 @@ export function useSpeech() {
     setIsListening(false)
   }, [])
 
-  return { 
-    speak, 
-    stopSpeaking, 
-    startListening, 
-    stopListening, 
-    isListening, 
-    isSpeaking, 
-    isSupported 
+  return {
+    speak,
+    stopSpeaking,
+    startListening,
+    stopListening,
+    isListening,
+    isSpeaking,
+    isSupported,
   }
 }

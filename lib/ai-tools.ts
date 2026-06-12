@@ -18,6 +18,14 @@ import { activateStarkProtocol, deactivateStarkProtocol, detectDistraction, getP
 import { trackPrice, checkPriceAlerts, getUtilityBills, getSpendingInsights } from '@/lib/personal-finance'
 import { getContactReminders, summarizeConversation, getUpcomingEvents, sendGreetingMessage } from '@/lib/relationship-crm'
 import { readScreen, executeVoiceMacro, startGameSession, endGameSession, listMacros } from '@/lib/gamer-companion'
+import { recognizeGesture, startEyeTracking, stopEyeTracking, getCurrentGaze, detectCodeIssueByGaze, getGestureStats, getAvailableGestures } from '@/lib/gesture-control'
+import { getPrintJobStatus, checkFilament, detectPrintFailure, controlBenchTool, listBenchTools, scheduleAutoOff, getBenchPresenceSafety } from '@/lib/engineering-iot'
+import { sendHapticAlert, getHapticHistory, acknowledgeAlert, configureBoneConduction, getBoneConductionStatus, findWearableDevices, vibrateMorse, getAlertPatterns, testHapticFeedback } from '@/lib/haptic-notifications'
+import { activateChaosMonkey, getChaosStatus, resolveChaosChallenge, getChaosScoreboard, listChaosChallenges } from '@/lib/chaos-monkey'
+import { scanFridge, suggestRecipe, getCircadianStatus, adjustCircadianLighting, analyzeMicroExpressions, activateSlowDownProtocol, getNutritionAnalysis } from '@/lib/bio-hacking'
+import { findArbitrageOpportunities, executeArbitrage, auditSmartContract, getMiningStatus, stopMining, setRiskTolerance } from '@/lib/crypto-web3'
+import { scanLegalPortals, generateTaxDocuments, payTaxDocument } from '@/lib/fiscal-warfare'
+import { getHoneypotStatus, triggerCleanSlate, getCleanSlateStatus, deactivateCleanSlate, blockIntruder, getNetworkThreatScore } from '@/lib/cyber-defense'
 
 const createCalendarEventTool: FunctionDeclaration = {
   name: 'createCalendarEvent',
@@ -782,6 +790,393 @@ const listMacrosTool: FunctionDeclaration = {
   },
 }
 
+// ─── GESTURE CONTROL / COMPUTER VISION TOOLS ────────────────────────────────────
+
+const recognizeGestureTool: FunctionDeclaration = {
+  name: 'recognizeGesture',
+  description: 'Usa a webcam e MediaPipe para reconhecer gestos manuais em tempo real. Mapeia movimentos das mãos para ações: palma virada pra cima (aumentar volume), punho fechado (pausar música), arrastar mão para esquerda/direita (mudar de aba), pinça (zoom), apontar (movimentar cursor).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      handPosition: { type: SchemaType.STRING, description: 'Posição da mão detectada (opcional, para refinamento).' },
+      movement: { type: SchemaType.STRING, description: 'Movimento detectado (opcional).' },
+    },
+  },
+}
+
+const startEyeTrackingTool: FunctionDeclaration = {
+  name: 'startEyeTracking',
+  description: 'Ativa o rastreamento ocular usando a webcam. Monitora para qual região da tela o usuário está olhando e detecta fixações prolongadas. Se você fixar o olhar em uma linha de código com erro por mais de 5 segundos, o J.A.R.V.I.S. avisa.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const stopEyeTrackingTool: FunctionDeclaration = {
+  name: 'stopEyeTracking',
+  description: 'Desativa o rastreamento ocular.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const getCurrentGazeTool: FunctionDeclaration = {
+  name: 'getCurrentGaze',
+  description: 'Obtém os dados atuais do rastreamento ocular: região da tela sendo observada, tempo de fixação, e se o usuário está focado. Se houver fixação prolongada em região de erro de código, retorna sugestão automática.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const detectCodeIssueByGazeTool: FunctionDeclaration = {
+  name: 'detectCodeIssueByGaze',
+  description: 'Analisa uma linha de código específica ou a região onde o olhar está fixado para detectar erros comuns: parênteses não fechados, ponto e vírgula faltando, chaves não balanceadas, etc. Útil quando o usuário está travado em um bug.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      codeLine: { type: SchemaType.STRING, description: 'A linha de código para analisar (opcional — se vazio, analisa a região do gaze).' },
+    },
+  },
+}
+
+// ─── ENGINEERING / IOT TOOLS ────────────────────────────────────────────────────
+
+const getPrintJobStatusTool: FunctionDeclaration = {
+  name: 'getPrintJobStatus',
+  description: 'Monitora o status da impressão 3D ativa: progresso em %, tempo decorrido, tempo restante estimado, temperatura do bico e da mesa, filamento usado. Exibe alertas se houver anomalias.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const checkFilamentTool: FunctionDeclaration = {
+  name: 'checkFilament',
+  description: 'Verifica o nível de todos os filamentos disponíveis para impressão 3D (PLA+, PETG, TPU, ABS). Retorna a porcentagem restante e alerta se algum precisar ser reabastecido.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const detectPrintFailureTool: FunctionDeclaration = {
+  name: 'detectPrintFailure',
+  description: 'Usa a câmera da impressora 3D com visão computacional para detectar falhas de impressão: efeito teia de aranha (spaghetti), acúmulo de filamento (blob), descolamento da base, under-extrusion. Se detectar falha, CANCELA automaticamente a impressão para economizar material.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const controlBenchToolTool: FunctionDeclaration = {
+  name: 'controlBenchTool',
+  description: 'Controla ferramentas da bancada de trabalho: liga/desliga ferro de solda, multímetro, fonte, extrator de fumaça, CNC. Permite ajustar temperatura do ferro de solda. ATIVIDADE DE SEGURANÇA: desliga automaticamente se o usuário se afastar por mais de 10 minutos.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      toolId: { type: SchemaType.STRING, description: 'ID da ferramenta (ex: "tool_1" para Ferro de Solda, "tool_5" para Impressora 3D).' },
+      toolAction: { type: SchemaType.STRING, format: 'enum', enum: ['on', 'off', 'standby'], description: 'Ação: ligar, desligar ou standby.' },
+      temperature: { type: SchemaType.NUMBER, description: 'Temperatura em °C para ferro de solda (opcional, ex: 350).' },
+    },
+    required: ['toolId', 'toolAction'],
+  },
+}
+
+const listBenchToolsTool: FunctionDeclaration = {
+  name: 'listBenchTools',
+  description: 'Lista todas as ferramentas disponíveis na bancada com status atual (ligado/desligado/standby), temperatura, consumo de energia e timer de desligamento automático.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const getBenchPresenceSafetyTool: FunctionDeclaration = {
+  name: 'getBenchPresenceSafety',
+  description: 'Verifica se o usuário está presente na bancada usando sensores de proximidade. Se ausente por mais de 10 minutos com ferramentas perigosas ligadas (ferro de solda, impressora 3D), desliga automaticamente e emite alerta de segurança.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+// ─── HAPTIC NOTIFICATIONS / WEARABLE TOOLS ──────────────────────────────────────
+
+const sendHapticAlertTool: FunctionDeclaration = {
+  name: 'sendHapticAlert',
+  description: 'Envia uma notificação por vibração vestível (pulseira ESP32, colete, anel). Usa padrões de vibração específicos: server_down (3 pulsos longos), network_intrusion (padrão escalonado), build_failed (2 pulsos médios), security_breach (vibração contínua intermitente). O padrão pode ser sentido em código Morse no pulso.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      alertType: { type: SchemaType.STRING, format: 'enum', enum: ['server_down', 'network_intrusion', 'build_failed', 'deploy_failed', 'security_breach', 'system_alert', 'custom'], description: 'Tipo de alerta: server_down, network_intrusion, build_failed, deploy_failed, security_breach, system_alert.' },
+      message: { type: SchemaType.STRING, description: 'Mensagem opcional para acompanhar o alerta.' },
+    },
+    required: ['alertType'],
+  },
+}
+
+const configureBoneConductionTool: FunctionDeclaration = {
+  name: 'configureBoneConduction',
+  description: 'Configura o sistema de áudio por condução óssea (fones Shokz ou similar). Permite ativar/desativar, ajustar volume, ativar modo privacidade (áudio apenas para o usuário) e passagem de som ambiente.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      enabled: { type: SchemaType.BOOLEAN, description: 'Ativar ou desativar o áudio por condução óssea.' },
+      volume: { type: SchemaType.NUMBER, description: 'Volume de 0 a 100.' },
+      privacyMode: { type: SchemaType.BOOLEAN, description: 'Modo privacidade: áudio audível apenas para o usuário.' },
+    },
+  },
+}
+
+const findWearableDevicesTool: FunctionDeclaration = {
+  name: 'findWearableDevices',
+  description: 'Escaneia por dispositivos hápticos vestíveis pareados (pulseira, colete, anel ESP32). Retorna status da bateria, versão do firmware e conectividade.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const vibrateMorseTool: FunctionDeclaration = {
+  name: 'vibrateMorse',
+  description: 'Converte um texto em código Morse e envia como padrão de vibração para dispositivos hápticos vestíveis. O usuário sente o padrão no pulso ou colete. Ideal para alertas silenciosos.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      text: { type: SchemaType.STRING, description: 'O texto a ser convertido em código Morse (ex: "SOS", "ALERTA", "INIMIGO").' },
+    },
+    required: ['text'],
+  },
+}
+
+// ─── CHAOS MONKEY / CRISIS SIMULATION TOOLS ─────────────────────────────────────
+
+const activateChaosMonkeyTool: FunctionDeclaration = {
+  name: 'activateChaosMonkey',
+  description: 'ATIVA O MODO CHAOS MONKEY — o J.A.R.V.I.S. vai deliberadamente sabotar o ambiente de desenvolvimento para treinar o usuário sob pressão. Pode quebrar configuração de rede, deletar variável de ambiente, injetar bug no código, corromper config, sequestrar DNS ou comprometer git. O usuário tem X minutos para descobrir e consertar. Dificuldades: easy (5min), medium (10min), hard (15min), stark (15min desafios complexos).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      difficulty: { type: SchemaType.STRING, format: 'enum', enum: ['easy', 'medium', 'hard', 'stark'], description: 'Dificuldade do desafio: easy (5min), medium (10min), hard (15min), stark (15min - nível Tony Stark).' },
+    },
+  },
+}
+
+const getChaosStatusTool: FunctionDeclaration = {
+  name: 'getChaosStatus',
+  description: 'Retorna o status atual do desafio Chaos Monkey: tempo restante, desafio ativo, pontuação e dica. Se o tempo acabou, revela a solução automaticamente.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const resolveChaosChallengeTool: FunctionDeclaration = {
+  name: 'resolveChaosChallenge',
+  description: 'Registra que o desafio Chaos Monkey foi resolvido. Calcula pontuação baseada na dificuldade e bônus de tempo. Atualiza o scoreboard e ranking.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      answer: { type: SchemaType.STRING, description: 'Descrição opcional de como o desafio foi resolvido.' },
+    },
+  },
+}
+
+const getChaosScoreboardTool: FunctionDeclaration = {
+  name: 'getChaosScoreboard',
+  description: 'Exibe o scoreboard completo do Chaos Monkey: pontuação total, nível atual (Estagiário → Técnico → Engenheiro → Arquiteto → Mestre → Gênio → Lenda), conquistas desbloqueadas e pontos necessários para o próximo nível.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+// ─── BIO-HACKING / NUTRITION / CIRCADIAN TOOLS ───────────────────────────────────
+
+const scanFridgeTool: FunctionDeclaration = {
+  name: 'scanFridge',
+  description: 'Escaneia o conteúdo da geladeira/despensa usando visão computacional. Retorna itens próximos ao vencimento, análise nutricional estimada e detecta deficiências na dieta (ex: magnésio baixo, vitamina C insuficiente).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const suggestRecipeTool: FunctionDeclaration = {
+  name: 'suggestRecipe',
+  description: 'Sugere receitas inteligentes baseadas nos ingredientes disponíveis na geladeira que estão perto de vencer, combinado com deficiências nutricionais estimadas da dieta do usuário. Ex: "Senhor, seus níveis de magnésio estão baixos e a couve vai vencer amanhã. Sugiro um suco verde."',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const getCircadianStatusTool: FunctionDeclaration = {
+  name: 'getCircadianStatus',
+  description: 'Retorna o status da iluminação circadiana: temperatura de cor atual (Kelvin), intensidade, fase do ciclo (amanhecer, manhã, tarde, pôr do sol, noite) e programação de transições. A iluminação ajusta-se automaticamente ao ciclo solar para otimizar cortisol de manhã e melatonina à noite.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const adjustCircadianLightingTool: FunctionDeclaration = {
+  name: 'adjustCircadianLighting',
+  description: 'Ajusta o sistema de iluminação circadiana. No modo auto, a temperatura de cor (Kelvin) e intensidade seguem o ciclo solar automaticamente. No modo manual, permite definir Kelvin (1000-10000K) e brilho (0-100%) manualmente.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      mode: { type: SchemaType.STRING, format: 'enum', enum: ['auto', 'manual', 'disabled'], description: 'Modo de operação: auto (segue ciclo solar), manual (controle manual), disabled (desativado).' },
+      kelvin: { type: SchemaType.NUMBER, description: 'Temperatura de cor em Kelvin (1000-10000). Ex: 2200K âmbar noturno, 5500K luz do dia.' },
+      brightness: { type: SchemaType.NUMBER, description: 'Intensidade luminosa (0-100).' },
+    },
+  },
+}
+
+const analyzeMicroExpressionsTool: FunctionDeclaration = {
+  name: 'analyzeMicroExpressions',
+  description: 'Analisa microexpressões faciais e tom de voz do usuário via webcam e microfone para detectar sinais precoces de burnout, ansiedade ou estresse. Se detectar risco elevado, ativa automaticamente o Protocolo de Desaceleração de Agenda.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const activateSlowDownProtocolTool: FunctionDeclaration = {
+  name: 'activateSlowDownProtocol',
+  description: 'Ativa o Protocolo de Desaceleração de Emergência: cancela reuniões não críticas, ajusta iluminação para modo relaxamento (2700K), silencia notificações não urgentes e sugere pausas obrigatórias. Use quando detectar sinais de burnout ou quando o usuário pedir.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+// ─── CRYPTO / WEB3 TOOLS ───────────────────────────────────────────────────────
+
+const findArbitrageOpportunitiesTool: FunctionDeclaration = {
+  name: 'findArbitrageOpportunities',
+  description: 'Monitora múltiplas corretoras (Binance, Bybit, OKX, Kucoin, Coinbase, Kraken, Uniswap) em busca de distorções de preço. Retorna oportunidades de arbitragem com lucro estimado, nível de risco e rota de execução (compra/venda).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const executeArbitrageTool: FunctionDeclaration = {
+  name: 'executeArbitrage',
+  description: 'Executa uma operação de arbitragem identificada. Compra na corretora de menor preço e vende na de maior preço automaticamente, respeitando o teto de risco configurado. Retorna hash da transação e lucro realizado.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      opportunityIndex: { type: SchemaType.NUMBER, description: 'Índice da oportunidade a executar (0 = melhor oportunidade).' },
+    },
+  },
+}
+
+const auditSmartContractTool: FunctionDeclaration = {
+  name: 'auditSmartContract',
+  description: 'Audita um contrato inteligente antes de você interagir com ele. Varre o código em busca de: vulnerabilidades (reentrância, falta de deadline, centralização), funções ocultas de rug pull, taxas abusivas e problemas de gas. Emite um veredito de segurança com score de 0-100.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      contractAddress: { type: SchemaType.STRING, description: 'Endereço do contrato inteligente na blockchain (ex: "0x1234...").' },
+      chain: { type: SchemaType.STRING, description: 'Blockchain do contrato (ex: "Ethereum", "BSC", "Polygon"). Opcional.' },
+    },
+    required: ['contractAddress'],
+  },
+}
+
+const getMiningStatusTool: FunctionDeclaration = {
+  name: 'getMiningStatus',
+  description: 'Monitora o status da GPU e as condições para mineração/validação sob demanda. Verifica: preço da energia local, ociosidade da GPU, presença do usuário. Se condições ideais (GPU ociosa, energia barata, usuário ausente), inicia mineração automaticamente.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const stopMiningTool: FunctionDeclaration = {
+  name: 'stopMining',
+  description: 'Encerra a sessão de mineração/validação atual. Retorna o total ganho na sessão.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+// ─── FISCAL WARFARE / LEGAL & TAX TOOLS ─────────────────────────────────────────
+
+const scanLegalPortalsTool: FunctionDeclaration = {
+  name: 'scanLegalPortals',
+  description: 'Varre diários oficiais (DJE), portais de justiça, SERPRO, DETRAN e Receita Federal em busca de citações ao nome do usuário ou empresa. Detecta: processos, multas de trânsito, débitos fiscais e tramites burocráticos. Retorna PDFs baixados com resumo jurídico feito por IA.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const generateTaxDocumentsTool: FunctionDeclaration = {
+  name: 'generateTaxDocuments',
+  description: 'Gera automaticamente os documentos fiscais do mês (DAS, DARF, ISS, ICMS, INSS, IRPF/IRPJ). Lê extratos e notas fiscais, calcula imposto devido, busca deduções fiscais legais automáticas e deixa tudo pronto para pagamento com um clique.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const payTaxDocumentTool: FunctionDeclaration = {
+  name: 'payTaxDocument',
+  description: 'Realiza o pagamento de um documento fiscal específico (DAS, DARF, ISS, etc.) informando o ID do documento.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      documentId: { type: SchemaType.STRING, description: 'ID do documento fiscal a pagar (ex: "tax_1" para DAS de Maio/2026).' },
+    },
+    required: ['documentId'],
+  },
+}
+
+// ─── CYBER DEFENSE TOOLS ────────────────────────────────────────────────────────
+
+const getHoneypotStatusTool: FunctionDeclaration = {
+  name: 'getHoneypotStatus',
+  description: 'Retorna o status do Honeypot Doméstico — um dispositivo virtual falso que simula vulnerabilidades (SMB, FTP, RDP, Telnet, MySQL) para atrair invasores. Se alguém tentar invadir, o J.A.R.V.I.S. bloqueia o MAC no roteador, dispara alarme e derruba a conexão do invasor.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const triggerCleanSlateTool: FunctionDeclaration = {
+  name: 'triggerCleanSlate',
+  description: 'ATIVA O PROTOCOLO CLEAN SLATE — emergência máxima. Criptografa todas as pastas confidenciais com AES-256, apaga históricos, encerra todas as sessões, revoga tokens, desloga de todas as contas e desliga o servidor central. Reativação exige biometria + senha de 32 caracteres.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const getCleanSlateStatusTool: FunctionDeclaration = {
+  name: 'getCleanSlateStatus',
+  description: 'Retorna o status atual do Protocolo Clean Slate: se está ativo, quais pastas foram criptografadas, quantas sessões foram encerradas e os passos para reativação do sistema.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
+const getNetworkThreatScoreTool: FunctionDeclaration = {
+  name: 'getNetworkThreatScore',
+  description: 'Retorna o score de ameaças da rede (0-100), nível de perigo (safe/critical), número de ameaças ativas, IPs bloqueados e recomendações de segurança baseadas no histórico de ataques.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {},
+  },
+}
+
 export const functionDeclarations: FunctionDeclaration[] = [
   createCalendarEventTool,
   listCalendarEventsTool,
@@ -874,6 +1269,59 @@ export const functionDeclarations: FunctionDeclaration[] = [
   executeVoiceMacroTool,
   startGameSessionTool,
   listMacrosTool,
+
+  // Gesture Control / Computer Vision
+  recognizeGestureTool,
+  startEyeTrackingTool,
+  stopEyeTrackingTool,
+  getCurrentGazeTool,
+  detectCodeIssueByGazeTool,
+
+  // Engineering / IoT
+  getPrintJobStatusTool,
+  checkFilamentTool,
+  detectPrintFailureTool,
+  controlBenchToolTool,
+  listBenchToolsTool,
+  getBenchPresenceSafetyTool,
+
+  // Haptic Notifications / Wearable
+  sendHapticAlertTool,
+  configureBoneConductionTool,
+  findWearableDevicesTool,
+  vibrateMorseTool,
+
+  // Chaos Monkey / Crisis Simulation
+  activateChaosMonkeyTool,
+  getChaosStatusTool,
+  resolveChaosChallengeTool,
+  getChaosScoreboardTool,
+
+  // Bio-Hacking / Nutrition / Circadian
+  scanFridgeTool,
+  suggestRecipeTool,
+  getCircadianStatusTool,
+  adjustCircadianLightingTool,
+  analyzeMicroExpressionsTool,
+  activateSlowDownProtocolTool,
+
+  // Crypto / Web3
+  findArbitrageOpportunitiesTool,
+  executeArbitrageTool,
+  auditSmartContractTool,
+  getMiningStatusTool,
+  stopMiningTool,
+
+  // Fiscal Warfare
+  scanLegalPortalsTool,
+  generateTaxDocumentsTool,
+  payTaxDocumentTool,
+
+  // Cyber Defense
+  getHoneypotStatusTool,
+  triggerCleanSlateTool,
+  getCleanSlateStatusTool,
+  getNetworkThreatScoreTool,
 ]
 
 let currentUserId: string | null = null
@@ -1067,6 +1515,96 @@ export async function executeTool(
       return startGameSession(String(args.gameTitle ?? ''))
     case 'listMacros':
       return listMacros(args.game ? String(args.game) : undefined)
+
+    // Gesture Control / Computer Vision
+    case 'recognizeGesture':
+      return recognizeGesture(args.handPosition ? String(args.handPosition) : undefined, args.movement ? String(args.movement) : undefined)
+    case 'startEyeTracking':
+      return startEyeTracking()
+    case 'stopEyeTracking':
+      return stopEyeTracking()
+    case 'getCurrentGaze':
+      return getCurrentGaze()
+    case 'detectCodeIssueByGaze':
+      return detectCodeIssueByGaze(args.codeLine ? String(args.codeLine) : undefined)
+
+    // Engineering / IoT
+    case 'getPrintJobStatus':
+      return getPrintJobStatus()
+    case 'checkFilament':
+      return checkFilament()
+    case 'detectPrintFailure':
+      return detectPrintFailure()
+    case 'controlBenchTool':
+      return controlBenchTool(String(args.toolId ?? ''), args.toolAction ?? 'off', args.temperature ? Number(args.temperature) : undefined)
+    case 'listBenchTools':
+      return listBenchTools()
+    case 'getBenchPresenceSafety':
+      return getBenchPresenceSafety()
+
+    // Haptic Notifications / Wearable
+    case 'sendHapticAlert':
+      return sendHapticAlert(args.alertType ?? 'system_alert', args.message ? String(args.message) : undefined)
+    case 'configureBoneConduction':
+      return configureBoneConduction(args)
+    case 'findWearableDevices':
+      return findWearableDevices()
+    case 'vibrateMorse':
+      return vibrateMorse(String(args.text ?? ''))
+
+    // Chaos Monkey / Crisis Simulation
+    case 'activateChaosMonkey':
+      return activateChaosMonkey(args.difficulty as any)
+    case 'getChaosStatus':
+      return getChaosStatus()
+    case 'resolveChaosChallenge':
+      return resolveChaosChallenge(args.answer ? String(args.answer) : undefined)
+    case 'getChaosScoreboard':
+      return getChaosScoreboard()
+
+    // Bio-Hacking / Nutrition / Circadian
+    case 'scanFridge':
+      return scanFridge()
+    case 'suggestRecipe':
+      return suggestRecipe()
+    case 'getCircadianStatus':
+      return getCircadianStatus()
+    case 'adjustCircadianLighting':
+      return adjustCircadianLighting(args.mode as any, args.kelvin ? Number(args.kelvin) : undefined, args.brightness !== undefined ? Number(args.brightness) : undefined)
+    case 'analyzeMicroExpressions':
+      return analyzeMicroExpressions()
+    case 'activateSlowDownProtocol':
+      return activateSlowDownProtocol()
+
+    // Crypto / Web3
+    case 'findArbitrageOpportunities':
+      return findArbitrageOpportunities()
+    case 'executeArbitrage':
+      return executeArbitrage(args.opportunityIndex !== undefined ? Number(args.opportunityIndex) : undefined)
+    case 'auditSmartContract':
+      return auditSmartContract(String(args.contractAddress ?? ''), args.chain ? String(args.chain) : undefined)
+    case 'getMiningStatus':
+      return getMiningStatus()
+    case 'stopMining':
+      return stopMining()
+
+    // Fiscal Warfare
+    case 'scanLegalPortals':
+      return scanLegalPortals()
+    case 'generateTaxDocuments':
+      return generateTaxDocuments()
+    case 'payTaxDocument':
+      return payTaxDocument(String(args.documentId ?? ''))
+
+    // Cyber Defense
+    case 'getHoneypotStatus':
+      return getHoneypotStatus()
+    case 'triggerCleanSlate':
+      return triggerCleanSlate()
+    case 'getCleanSlateStatus':
+      return getCleanSlateStatus()
+    case 'getNetworkThreatScore':
+      return getNetworkThreatScore()
 
     default:
       return { error: `Função desconhecida: ${name}` }
